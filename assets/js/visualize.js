@@ -3,6 +3,13 @@
  * Handles the visualization of metrics data using Chart.js
  */
 
+// Add this at the top of your file, after the DOMContentLoaded listener
+window.addEventListener('unload', function() {
+    // Cleanup all chart instances
+    const charts = Object.values(Chart.instances);
+    charts.forEach(chart => chart.destroy());
+});
+
 /**
  * Main function to process data and create charts
  * @param {Array} dailyMetrics - Array of daily metrics data
@@ -578,12 +585,49 @@ function createMuscleGroupVolumeChart(workoutDetails) {
  */
 function setupExerciseProgressChart(workoutDetails) {
     const exerciseSelector = document.getElementById('exerciseSelector');
-    let chart = null;
-    
+    const chartContainer = document.getElementById('exerciseProgressChartWrapper');
+    let currentChart = null;
+
+    // Function to safely destroy and recreate canvas
+    function resetChart() {
+        // Destroy any existing chart
+        if (currentChart) {
+            currentChart.destroy();
+        }
+        
+        // Clear any other chart instances that might exist
+        const canvas = document.getElementById('exerciseProgressChart');
+        if (canvas) {
+            const existingChart = Chart.getChart(canvas);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+        }
+
+        // Remove and recreate canvas
+        const oldCanvas = document.getElementById('exerciseProgressChart');
+        if (oldCanvas) {
+            oldCanvas.remove();
+        }
+        
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = 'exerciseProgressChart';
+        chartContainer.appendChild(newCanvas);
+        return newCanvas;
+    }
+
+    // Initial setup
+    if (exerciseSelector.value) {
+        const canvas = resetChart();
+        currentChart = createExerciseProgressChart(workoutDetails, exerciseSelector.value, canvas);
+    }
+
+    // Handle exercise selection changes
     exerciseSelector.addEventListener('change', function() {
         const selectedExercise = this.value;
         if (selectedExercise) {
-            createExerciseProgressChart(workoutDetails, selectedExercise, chart);
+            const canvas = resetChart();
+            currentChart = createExerciseProgressChart(workoutDetails, selectedExercise, canvas);
         }
     });
 }
@@ -592,11 +636,10 @@ function setupExerciseProgressChart(workoutDetails) {
  * Creates a chart for an exercise's progress
  * @param {Array} workoutDetails - Array of workout details data
  * @param {string} exerciseName - Name of the exercise to display
- * @param {Chart} existingChart - Existing chart instance (if any)
+ * @param {HTMLCanvasElement} canvas - Canvas element to render the chart on
+ * @returns {Chart} The newly created chart instance
  */
-function createExerciseProgressChart(workoutDetails, exerciseName, existingChart) {
-    const ctx = document.getElementById('exerciseProgressChart').getContext('2d');
-    
+function createExerciseProgressChart(workoutDetails, exerciseName, canvas) {
     // Process exercise progress data
     const exerciseData = workoutDetails.filter(workout => workout.exercise_name === exerciseName);
     
@@ -613,13 +656,7 @@ function createExerciseProgressChart(workoutDetails, exerciseName, existingChart
         volumes.push((workout.sets || 0) * (workout.reps || 0) * (workout.load_weight || 1));
     });
     
-    // Destroy existing chart if it exists
-    if (existingChart) {
-        existingChart.destroy();
-    }
-    
-    // Create new chart
-    return new Chart(ctx, {
+    return new Chart(canvas, {
         type: 'line',
         data: {
             labels: labels,
@@ -680,7 +717,7 @@ function createExerciseProgressChart(workoutDetails, exerciseName, existingChart
                     text: 'Progress for ' + exerciseName
                 },
                 legend: {
-                    position: 'top',
+                    position: 'top'
                 }
             }
         }
