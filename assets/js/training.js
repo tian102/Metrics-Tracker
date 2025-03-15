@@ -291,56 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
             sessionForm.addEventListener('submit', handleSessionFormSubmit);
         }
         
-        // Add a reset button to the exercise form
-    const resetFormBtn = document.createElement('button');
-    resetFormBtn.type = 'button';
-    resetFormBtn.className = 'btn btn-outline-secondary ms-2';
-    resetFormBtn.textContent = 'Reset Form';
-    resetFormBtn.addEventListener('click', function() {
-        // Clear sessionStorage
-        sessionStorage.removeItem('lastMuscleGroup');
-        sessionStorage.removeItem('lastEquipment');
-        sessionStorage.removeItem('lastExercise');
-        
-        // Reset form fields
-        const form = document.getElementById('newExerciseForm');
-        form.reset();
-        
-        // Reset dropdowns to initial state
-        const muscleGroupSelect = form.querySelector('[name="muscle_group"]');
-        const equipmentSelect = form.querySelector('[name="equipment"]');
-        const exerciseSelect = form.querySelector('[name="exercise_name"]');
-        
-        if (muscleGroupSelect) muscleGroupSelect.selectedIndex = 0;
-        if (equipmentSelect) {
-            // Clear and reset equipment options
-            equipmentSelect.innerHTML = '';
-            equipmentSelect.appendChild(new Option('Select equipment', ''));
-        }
-        if (exerciseSelect) {
-            // Clear and reset exercise options
-            exerciseSelect.innerHTML = '';
-            exerciseSelect.appendChild(new Option('Select exercise name', ''));
-        }
-        
-        // Reset range sliders
-        form.querySelectorAll('input[type="range"]').forEach(slider => {
-            slider.value = 5;
-            const valueDisplay = slider.nextElementSibling;
-            if (valueDisplay && valueDisplay.classList.contains('range-value')) {
-                valueDisplay.textContent = '5';
-            }
-        });
-        
-        showMessage('Form Reset', 'Form has been reset to default values', 'info');
-    });
-    
-    // Add the reset button to the form buttons
-    const formButtons = document.querySelector('#newExerciseForm .form-group:last-child');
-    if (formButtons) {
-        formButtons.appendChild(resetFormBtn);
-    }
-    
         // Add Exercise button handler
         const addExerciseBtn = document.getElementById('addExerciseBtn');
         const newExerciseForm = document.getElementById('newExerciseForm');
@@ -360,6 +310,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 newExerciseForm.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+    
+        // Cancel Add Exercise button handler
+        const cancelAddExercise = document.getElementById('cancelAddExercise');
+        if (cancelAddExercise && newExerciseForm && addExerciseBtn) {
+            cancelAddExercise.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent default button action
+                newExerciseForm.style.display = 'none';
+                addExerciseBtn.style.display = 'inline-block';
             });
         }
     
@@ -571,11 +531,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const exerciseId = container.dataset.id;
 
         if (confirm('Are you sure you want to delete this exercise? This action cannot be undone.')) {
-            // Clear form state data when deleting
-            sessionStorage.removeItem('lastMuscleGroup');
-            sessionStorage.removeItem('lastEquipment');
-            sessionStorage.removeItem('lastExercise');
-            
             fetch('api/workout_details.php', {
                 method: 'DELETE',
                 headers: {
