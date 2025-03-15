@@ -1,4 +1,10 @@
 <?php
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+?>
+
+<?php
 require_once 'includes/header.php';
 require_once 'includes/functions.php';
 
@@ -46,7 +52,7 @@ foreach ($trainingSessions as $session) {
                 <!-- Date filter form -->
                 <div class="d-flex flex-wrap gap-2">
                     <!-- Modified date range form that preserves the active tab -->
-                    <form id="dateRangeForm" class="mb-4">
+                    <form id="dateRangeForm" method="GET" class="mb-4">
                         <div class="row g-3 align-items-end">
                             <div class="col-md-4">
                                 <label for="startDate" class="form-label">Start Date</label>
@@ -247,8 +253,12 @@ foreach ($trainingSessions as $session) {
                                         </div>
                                     </div>
                                     <div class="card-body">
-                                        <div class="chart-container">
-                                            <canvas id="exerciseProgressChart"></canvas>
+                                        <!-- Add a wrapper div for the chart -->
+                                        <div id="exerciseProgressChartWrapper" class="chart-container">
+                                            <!-- Clear the chart container before recreating -->
+                                            <div style="position: relative; height: 300px;">
+                                                <canvas id="exerciseProgressChart"></canvas>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -307,50 +317,62 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get tab elements
-    const tabLinks = document.querySelectorAll('.nav-tabs .nav-link');
-    const dateRangeForm = document.getElementById('dateRangeForm');
-    
-    // Add hidden input field to the form if it doesn't exist
-    let activeTabInput = dateRangeForm.querySelector('input[name="active_tab"]');
-    if (!activeTabInput) {
-        activeTabInput = document.createElement('input');
-        activeTabInput.type = 'hidden';
-        activeTabInput.name = 'active_tab';
-        dateRangeForm.appendChild(activeTabInput);
-    }
-    
-    // Set initial value from URL parameter or default to first tab
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeTabId = urlParams.get('active_tab') || 'daily-metrics-tab';
-    
-    // Activate the correct tab on page load
-    const tabToActivate = document.getElementById(activeTabId);
-    if (tabToActivate) {
-        // Create a new Bootstrap tab instance and show it
-        const tab = new bootstrap.Tab(tabToActivate);
-        tab.show();
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get tab elements
+        const tabLinks = document.querySelectorAll('.nav-tabs .nav-link');
+        const dateRangeForm = document.getElementById('dateRangeForm');
         
-        // Set the hidden input value
-        activeTabInput.value = activeTabId;
-    }
-    
-    // Update hidden input when a tab is clicked
-    tabLinks.forEach(tabLink => {
-        tabLink.addEventListener('click', function() {
-            activeTabInput.value = this.id;
+        // Add hidden input field to the form if it doesn't exist
+        let activeTabInput = dateRangeForm.querySelector('input[name="active_tab"]');
+        if (!activeTabInput) {
+            activeTabInput = document.createElement('input');
+            activeTabInput.type = 'hidden';
+            activeTabInput.name = 'active_tab';
+            dateRangeForm.appendChild(activeTabInput);
+        }
+        
+        // Set initial value from URL parameter or default to first tab
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTabId = urlParams.get('active_tab') || 'daily-metrics-tab';
+        
+        // Activate the correct tab on page load
+        const tabToActivate = document.getElementById(activeTabId);
+        if (tabToActivate) {
+            // Create a new Bootstrap tab instance and show it
+            const tab = new bootstrap.Tab(tabToActivate);
+            tab.show();
+            
+            // Set the hidden input value
+            activeTabInput.value = activeTabId;
+        }
+        
+        // Update hidden input when a tab is clicked
+        tabLinks.forEach(tabLink => {
+            tabLink.addEventListener('click', function() {
+                activeTabInput.value = this.id;
+            });
+        });
+        
+        // Update form action to preserve the active tab when submitting
+        dateRangeForm.addEventListener('submit', function(e) {
+            // Prevent default form submission
+            e.preventDefault();
+            
+            // Make sure we have the current active tab
+            const currentActiveTab = document.querySelector('.nav-tabs .nav-link.active');
+            if (currentActiveTab) {
+                activeTabInput.value = currentActiveTab.id;
+            }
+            
+            // Now submit the form
+            this.submit();
         });
     });
-    
-    // Update form action to preserve the active tab when submitting
-    dateRangeForm.addEventListener('submit', function(e) {
-        // Make sure we have the current active tab
-        const currentActiveTab = document.querySelector('.nav-tabs .nav-link.active');
-        if (currentActiveTab) {
-            activeTabInput.value = currentActiveTab.id;
-        }
+    window.addEventListener('unload', function() {
+        // Cleanup all chart instances
+        const charts = Object.values(Chart.instances);
+        charts.forEach(chart => chart.destroy());
     });
-});
 </script>
+
 <?php require_once 'includes/footer.php'; ?>
