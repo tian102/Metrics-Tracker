@@ -1,0 +1,168 @@
+/* Dark Theme */
+:root {
+    --body-bg: #121212;
+    --text-color: #e0e0e0;
+    --card-bg: #1e1e1e;
+    --card-header-bg: #2c2c2c;
+    --card-border: #333333;
+    --input-bg: #2c2c2c;
+    --input-border: #444444;
+    --nav-bg: #000000;
+    --nav-text: #e0e0e0;
+    --nav-link-hover: #3498db;
+    --primary-color: #3498db;
+    --secondary-color: #95a5a6;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --info-color: #3498db;
+    --light-color: #2c2c2c;
+    --dark-color: #121212;
+}
+
+/* Apply theme variables */
+body {
+    background-color: var(--body-bg);
+    color: var(--text-color);
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+}
+
+.card-header {
+    background-color: var(--card-header-bg);
+    border-color: var(--card-border);
+}
+
+.form-control, .form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-color);
+}
+
+header.bg-dark {
+    background-color: var(--nav-bg) !important;
+}
+
+header .nav-link {
+    color: var(--nav-text);
+}
+
+header .nav-link:hover,
+header .nav-link.active {
+    color: var(--nav-link-hover);
+}
+
+/* Button overrides */
+.btn-primary {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color) !important;
+    border-color: var(--secondary-color) !important;
+}
+
+.btn-success {
+    background-color: var(--success-color) !important;
+    border-color: var(--success-color) !important;
+}
+
+.btn-danger {
+    background-color: var(--danger-color) !important;
+    border-color: var(--danger-color) !important;
+}
+
+.btn-warning {
+    background-color: var(--warning-color) !important;
+    border-color: var(--warning-color) !important;
+}
+
+.btn-info {
+    background-color: var(--info-color) !important;
+    border-color: var(--info-color) !important;
+}
+
+/* Modal overrides */
+.modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+}
+
+/* Alert styling */
+.alert-success {
+    background-color: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+    border-color: rgba(46, 204, 113, 0.4);
+}
+
+.alert-danger {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.4);
+}
+
+.alert-warning {
+    background-color: rgba(243, 156, 18, 0.2);
+    color: #f39c12;
+    border-color: rgba(243, 156, 18, 0.4);
+}
+
+.alert-info {
+    background-color: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    border-color: rgba(52, 152, 219, 0.4);
+}
+
+/* Table styling */
+table {
+    color: var(--text-color);
+}
+
+.table {
+    --bs-table-color: var(--text-color);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--card-border);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+thead {
+    background-color: var(--card-header-bg);
+}
+
+/* Dropdown styling */
+.dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+}
+
+.dropdown-item {
+    color: var(--text-color);
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--card-header-bg);
+    color: var(--text-color);
+}
+
+/* Tab styling */
+.nav-tabs .nav-link {
+    color: var(--text-color);
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--card-bg);
+    color: var(--primary-color);
+    border-color: var(--card-border) var(--card-border) var(--card-bg);
+}
+
+/* Misc elements */
+hr {
+    border-color: var(--card-border);
+}

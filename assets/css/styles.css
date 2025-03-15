@@ -1,0 +1,565 @@
+/* Custom styles to work with Bootstrap */
+:root {
+    --bs-primary: #3498db;
+    --bs-secondary: #2ecc71;
+    --bs-dark: #2c3e50;
+    --bs-light: #ecf0f1;
+    --bs-danger: #e74c3c;
+    --bs-success: #27ae60;
+    --bs-warning: #f39c12;
+    --bs-info: #3498db;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+/* Custom card styles */
+.metric-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* Range slider customization */
+input[type="range"] {
+    width: 100%;
+}
+
+.range-value {
+    display: inline-block;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+/* Exercise container */
+.exercise-container {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background-color: #f8f9fa;
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+/* Fix for button colors */
+.btn-primary {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.btn-primary:hover {
+    color: #fff !important;
+    background-color: #0b5ed7 !important;
+    border-color: #0a58ca !important;
+}
+
+.btn-secondary {
+    color: #fff !important;
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+.btn-secondary:hover {
+    color: #fff !important;
+    background-color: #5c636a !important;
+    border-color: #565e64 !important;
+}
+
+.btn-success {
+    color: #fff !important;
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}
+
+.btn-success:hover {
+    color: #fff !important;
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
+}
+
+.btn:not(:disabled):not(.disabled) {
+    cursor: pointer;
+}
+
+/* Gap utility for browsers that don't support gap */
+.gap-2 > * {
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.gap-2 > *:last-child {
+    margin-right: 0;
+}
+
+@supports (gap: 0.5rem) {
+    .gap-2 {
+        gap: 0.5rem;
+    }
+    
+    .gap-2 > * {
+        margin-right: 0;
+        margin-bottom: 0;
+    }
+}
+
+/* Theme selector styles */
+.theme-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 2px;
+    margin-bottom: 1rem;
+}
+
+.theme-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.theme-card .card-body {
+    border-top-left-radius: calc(0.375rem - 2px);
+    border-top-right-radius: calc(0.375rem - 2px);
+}
+
+.theme-card .card-footer {
+    background-color: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 0.75rem 1rem;
+}
+
+.theme-card .form-check-input:checked + .form-check-label {
+    font-weight: bold;
+}
+
+.theme-card.border-primary {
+    border-color: var(--primary-color) !important;
+}
+
+/* Cards */
+.card {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.card-content {
+    margin-bottom: 1rem;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -10px;
+}
+
+.form-col {
+    flex: 1;
+    padding: 0 10px;
+    min-width: 200px;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+input[type="date"],
+input[type="time"] {
+    padding: 0.6rem;
+}
+
+textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+input:focus, 
+textarea:focus, 
+select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.range-slider {
+    margin-top: 0.5rem;
+}
+
+.range-value {
+    display: inline-block;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #25a25a;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+}
+
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+}
+
+th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Utility Classes */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+
+.section-divider {
+    margin: 2rem 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 1rem;
+}
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Stats Grid for Dashboard */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card .value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0.5rem 0;
+    color: var(--primary-color);
+}
+
+.stat-card .label {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Workout Form Specific */
+.exercise-container {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.exercise-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.exercise-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.add-exercise-btn {
+    display: block;
+    margin: 1.5rem auto;
+    padding: 0.5rem 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    nav ul {
+        flex-direction: column;
+    }
+    
+    nav ul li {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-col {
+        flex: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-card {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Alert Messages */
+.alert {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 4px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* Chart container styles - fixed for full width */
+.chart-container {
+    position: relative;
+    width: 100%; /* Ensure full width */
+    height: 300px; /* Fixed height */
+    margin: 0 auto; /* Center in container */
+}
+
+/* Make sure canvas fills its container */
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Ensure widget content divs use full width */
+.widget-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch; /* Make children stretch to full width */
+}
+
+/* For large widgets */
+.col-xl-12 .chart-container {
+    height: 400px; /* Taller height for large widgets */
+}
+
+/* Make dashboard cards use full width */
+#dashboardWidgets .card {
+    width: 100%;
+}
+
+#dashboardWidgets .card-body {
+    width: 100%;
+    padding: 1rem; /* Ensure consistent padding */
+}
+/* Add these CSS styles to your assets/css/styles.css file */
+
+/* Styles for enhanced select inputs */
+.select-with-option-container {
+    position: relative;
+    width: 100%;
+}
+
+.select-with-option-container .form-select {
+    width: 100%;
+    padding-right: 2.5rem;
+}
+
+/* Highlight custom options */
+.form-select option[selected] {
+    font-weight: bold;
+}
+
+/* Styling for the custom option inputs */
+.custom-option-input {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.custom-option-input input {
+    flex: 1;
+    margin-right: 0.5rem;
+}
+
+/* Style for widget container when being dragged */
+.widget-ghost {
+    opacity: 0.5;
+    background-color: #f8f9fa;
+    border: 1px dashed #0d6efd;
+}
+
+/* Make range sliders more consistent across browsers */
+input[type="range"].range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    outline: none;
+}
+
+input[type="range"].range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color, #0d6efd);
+    cursor: pointer;
+}
+
+input[type="range"].range-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color, #0d6efd);
+    cursor: pointer;
+    border: none;
+}
+
+.range-value {
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+/* Style the datalist dropdown icon */
+input[list] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23495057' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+}
