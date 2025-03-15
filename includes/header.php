@@ -44,19 +44,18 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                         <i class="fas fa-home"></i> Home
                                     </a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'daily.php') ? 'active' : ''; ?>" href="daily.php">
-                                        <i class="fas fa-calendar-day"></i> Daily Metrics
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" id="dailyTrackingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-calendar-day"></i> Daily Tracking
                                     </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'training.php') ? 'active' : ''; ?>" href="training.php">
-                                        <i class="fas fa-dumbbell"></i> Training Metrics
-                                    </a>
+                                    <ul class="dropdown-menu" aria-labelledby="dailyTrackingDropdown">
+                                        <li><a class="dropdown-item" href="daily.php"><i class="fas fa-heartbeat"></i> Health</a></li>
+                                        <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell"></i> Training</a></li>
+                                    </ul>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'visualize.php') ? 'active' : ''; ?>" href="visualize.php">
-                                        <i class="fas fa-chart-bar"></i> Visualize
+                                        <i class="fas fa-chart-bar"></i> Analytics
                                     </a>
                                 </li>
                             </ul>
