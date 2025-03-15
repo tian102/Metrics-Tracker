@@ -60,111 +60,131 @@ document.addEventListener('DOMContentLoaded', function() {
         setupExistingExerciseForms();
     }
 
-    function setupNewExerciseForm() {
-        const form = document.getElementById('newExerciseForm');
+    // Unified function for setting up exercise forms
+    function setupExerciseForm(form, existingValues = {}) {
         if (!form) return;
-
-        const muscleGroupSelect = createFilterSelect('muscle_group', exerciseData.muscleGroups);
-        const equipmentSelect = createFilterSelect('equipment', exerciseData.equipment);
-        const exerciseSelect = createFilterSelect('exercise_name', exerciseData.exercises);
-
+        
+        console.log('Setting up form with existing values:', existingValues);
+        
+        // Create select elements with proper mappings
+        const muscleGroupSelect = createSelectElement('muscle_group', exerciseData.muscleGroups, 
+            'name', 'name', existingValues.muscle_group);
+        
+        const equipmentSelect = createSelectElement('equipment', exerciseData.equipment, 
+            'name', 'name', existingValues.equipment);
+        
+        const exerciseSelect = createSelectElement('exercise_name', exerciseData.exercises, 
+            'exercise_name', 'exercise_name', existingValues.exercise_name);
+        
         // Replace existing inputs with new selects
         replaceInput(form, '[name="muscle_group"]', muscleGroupSelect);
         replaceInput(form, '[name="equipment"]', equipmentSelect);
         replaceInput(form, '[name="exercise_name"]', exerciseSelect);
-
-        // Set up the cascading filters
+        
+        // Set flag to prevent cascade events while restoring state
+        isRestoringState = true;
+        
+        // Pre-filter options based on existing values - using direct string comparison now
+        if (existingValues.muscle_group) {
+            // Get all equipment used with this muscle group
+            const compatibleEquipment = exerciseData.exercises
+                .filter(ex => ex.muscle_group === existingValues.muscle_group)
+                .map(ex => ex.equipment);
+            
+            // Create unique list
+            const uniqueEquipment = [...new Set(compatibleEquipment)];
+            
+            // Filter equipment options
+            filterSelectOptions(equipmentSelect, uniqueEquipment);
+            
+            // Ensure the existing equipment is selected
+            if (existingValues.equipment) {
+                selectOptionByValue(equipmentSelect, existingValues.equipment);
+            }
+        }
+        
+        if (existingValues.muscle_group && existingValues.equipment) {
+            // Filter exercises by both muscle group and equipment
+            const filteredExercises = exerciseData.exercises
+                .filter(ex => 
+                    ex.muscle_group === existingValues.muscle_group && 
+                    ex.equipment === existingValues.equipment
+                )
+                .map(ex => ex.exercise_name);
+                
+            // Filter exercise options
+            filterSelectOptions(exerciseSelect, filteredExercises);
+            
+            // Ensure the existing exercise is selected
+            if (existingValues.exercise_name) {
+                selectOptionByValue(exerciseSelect, existingValues.exercise_name);
+            }
+        }
+        
+        // Reset flag after restoration is complete
+        isRestoringState = false;
+        
+        // Setup cascading filters for this form
         setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect);
         
-        // Restore previous selections without triggering cascades
-        restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect);
+        return {
+            muscleGroupSelect,
+            equipmentSelect,
+            exerciseSelect
+        };
     }
-    
-    function restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect) {
-        const lastMuscleGroup = sessionStorage.getItem('lastMuscleGroup');
-        const lastEquipment = sessionStorage.getItem('lastEquipment');
-        const lastExercise = sessionStorage.getItem('lastExercise');
+
+    // Create a select element with proper value/text mapping
+    function createSelectElement(name, options, valueField, textField, selectedValue = '') {
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.name = name;
+        select.required = true;
+        select.id = name + '_' + Math.random().toString(36).substring(2, 7); // Add unique ID
         
-        if (!lastMuscleGroup) return;
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = `Select ${name.replace('_', ' ')}`;
+        select.appendChild(defaultOption);
         
-        try {
-            // Disable cascading events temporarily
-            isRestoringState = true;
-            
-            // Step 1: Set the muscle group and manually filter equipment options
-            muscleGroupSelect.value = lastMuscleGroup;
-            const selectedMuscleGroup = exerciseData.muscleGroups.find(mg => mg.id === parseInt(lastMuscleGroup))?.name;
-            
-            // Step 2: Manually filter equipment options based on muscle group
-            const filteredEquipment = lastMuscleGroup ? 
-                exerciseData.equipment.filter(eq => 
-                    exerciseData.exercises.some(ex => 
-                        ex.muscle_group === selectedMuscleGroup &&
-                        ex.equipment === eq.name
-                    )
-                ) : exerciseData.equipment;
-            
-            // Update equipment select without triggering cascades
-            updateSelectWithoutCascade(equipmentSelect, filteredEquipment, 'equipment');
-            
-            if (lastEquipment) {
-                // Set equipment value
-                equipmentSelect.value = lastEquipment;
-                const selectedEquipment = exerciseData.equipment.find(eq => eq.id === parseInt(lastEquipment))?.name;
-                
-                // Step 3: Manually filter exercise options based on muscle group and equipment
-                const filteredExercises = exerciseData.exercises.filter(ex => 
-                    ex.muscle_group === selectedMuscleGroup && 
-                    ex.equipment === selectedEquipment
-                );
-                
-                // Update exercise select without triggering cascades
-                updateSelectWithoutCascade(exerciseSelect, filteredExercises, 'exercise');
-                
-                if (lastExercise) {
-                    // Set exercise value
-                    exerciseSelect.value = lastExercise;
-                }
-            }
-        } finally {
-            // Always re-enable cascading events
-            isRestoringState = false;
-        }
-    }
-    
-    function updateSelectWithoutCascade(select, options, type) {
-        // Save current value
-        const currentValue = select.value;
-        
-        // Clear options
-        select.innerHTML = '';
-        select.appendChild(new Option('Select ' + select.name.replace('_', ' '), ''));
-        
-        // Add new options
+        // Add available options
         options.forEach(option => {
-            const optionText = type === 'exercise' ? option.exercise_name : option.name;
-            const optionValue = option.id;
-            const opt = new Option(optionText, optionValue);
+            const opt = document.createElement('option');
+            opt.value = option[valueField];
+            opt.textContent = option[textField];
+            
+            // If this matches the selected value, mark it as selected
+            if (option[valueField] === selectedValue) {
+                opt.selected = true;
+            }
+            
             select.appendChild(opt);
         });
         
-        // Restore current value if it's still valid
-        if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
-            select.value = currentValue;
-        }
+        return select;
+    }
+
+    function setupNewExerciseForm() {
+        const form = document.getElementById('newExerciseForm');
+        if (!form) return;
+        
+        return setupExerciseForm(form);
     }
 
     function setupExistingExerciseForms() {
-        document.querySelectorAll('.workout-detail-form').forEach(form => {
-            const muscleGroupSelect = createFilterSelect('muscle_group', exerciseData.muscleGroups);
-            const equipmentSelect = createFilterSelect('equipment', exerciseData.equipment);
-            const exerciseSelect = createFilterSelect('exercise_name', exerciseData.exercises);
-
-            replaceInput(form, '[name="muscle_group"]', muscleGroupSelect);
-            replaceInput(form, '[name="equipment"]', equipmentSelect);
-            replaceInput(form, '[name="exercise_name"]', exerciseSelect);
-
-            setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect);
+        const forms = document.querySelectorAll('.workout-detail-form');
+        
+        forms.forEach(form => {
+            // Extract existing values
+            const existingValues = {
+                muscle_group: form.querySelector('[name="muscle_group"]')?.value,
+                equipment: form.querySelector('[name="equipment"]')?.value,
+                exercise_name: form.querySelector('[name="exercise_name"]')?.value
+            };
+            
+            console.log('Existing values for form:', existingValues);
+            setupExerciseForm(form, existingValues);
         });
     }
 
@@ -201,18 +221,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect) {
         muscleGroupSelect.addEventListener('change', () => {
-            // Skip if we're currently restoring state
-            if (isRestoringState) return;
-            
-            updateEquipmentOptions(muscleGroupSelect.value, equipmentSelect);
-            updateExerciseOptions(muscleGroupSelect.value, equipmentSelect.value, exerciseSelect);
+            if (!isRestoringState) {
+                console.log('Muscle group changed to:', muscleGroupSelect.value);
+                
+                // Get all equipment used with this muscle group
+                const compatibleEquipment = exerciseData.exercises
+                    .filter(ex => ex.muscle_group === muscleGroupSelect.value)
+                    .map(ex => ex.equipment);
+                
+                // Create unique list
+                const uniqueEquipment = [...new Set(compatibleEquipment)];
+                
+                console.log('Compatible equipment:', uniqueEquipment);
+                
+                // Reset equipment dropdown
+                resetSelect(equipmentSelect);
+                
+                // Filter equipment options
+                filterSelectOptions(equipmentSelect, uniqueEquipment);
+                
+                // Reset exercise dropdown
+                resetSelect(exerciseSelect);
+            }
         });
-
+    
         equipmentSelect.addEventListener('change', () => {
-            // Skip if we're currently restoring state
-            if (isRestoringState) return;
-            
-            updateExerciseOptions(muscleGroupSelect.value, equipmentSelect.value, exerciseSelect);
+            if (!isRestoringState) {
+                console.log('Equipment changed to:', equipmentSelect.value);
+                
+                // Filter exercises by both muscle group and equipment
+                const filteredExercises = exerciseData.exercises
+                    .filter(ex => 
+                        ex.muscle_group === muscleGroupSelect.value && 
+                        ex.equipment === equipmentSelect.value
+                    )
+                    .map(ex => ex.exercise_name);
+                    
+                console.log('Compatible exercises:', filteredExercises);
+                
+                // Reset exercise dropdown
+                resetSelect(exerciseSelect);
+                
+                // Filter exercise options
+                filterSelectOptions(exerciseSelect, filteredExercises);
+            }
         });
     }
 
@@ -274,6 +326,91 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * UTILITY FUNCTIONS
      */
+    // Helper function to filter select options
+    function filterSelectOptions(selectElement, allowedValues) {
+        const options = selectElement.options;
+        
+        // Skip the first option (the placeholder)
+        for (let i = 1; i < options.length; i++) {
+            if (!allowedValues.includes(options[i].value)) {
+                options[i].disabled = true;
+                options[i].style.display = 'none';
+            } else {
+                options[i].disabled = false;
+                options[i].style.display = '';
+            }
+        }
+    }
+
+    // Helper function to select option by value
+    function selectOptionByValue(selectElement, value) {
+        const options = selectElement.options;
+        
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === value) {
+                selectElement.selectedIndex = i;
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    // Helper to reset a select to its default state
+    function resetSelect(selectElement) {
+        selectElement.selectedIndex = 0;
+        
+        // Re-enable all options
+        const options = selectElement.options;
+        for (let i = 1; i < options.length; i++) {
+            options[i].disabled = false;
+            options[i].style.display = '';
+        }
+    }
+
+    /**
+     * Restore previous selections for cascading dropdowns
+     * @param {HTMLSelectElement} muscleGroupSelect The muscle group select element
+     * @param {HTMLSelectElement} equipmentSelect The equipment select element
+     * @param {HTMLSelectElement} exerciseSelect The exercise select element
+     */
+    function restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect) {
+        if (!muscleGroupSelect || !equipmentSelect || !exerciseSelect) return;
+        
+        // Get currently selected values (if any)
+        const muscleGroup = muscleGroupSelect.value;
+        const equipment = equipmentSelect.value;
+        
+        // Set flag to prevent cascade events while restoring
+        isRestoringState = true;
+        
+        // If a muscle group is selected, filter equipment options
+        if (muscleGroup) {
+            // Get all equipment used with this muscle group
+            const compatibleEquipment = exerciseData.exercises
+                .filter(ex => ex.muscle_group === muscleGroup)
+                .map(ex => ex.equipment);
+                
+            const uniqueEquipment = [...new Set(compatibleEquipment)];
+            filterSelectOptions(equipmentSelect, uniqueEquipment);
+        }
+        
+        // If both muscle group and equipment are selected, filter exercise options
+        if (muscleGroup && equipment) {
+            const filteredExercises = exerciseData.exercises
+                .filter(ex => 
+                    ex.muscle_group === muscleGroup && 
+                    ex.equipment === equipment
+                )
+                .map(ex => ex.exercise_name);
+                
+            filterSelectOptions(exerciseSelect, filteredExercises);
+        }
+        
+        // Reset flag after restoration
+        isRestoringState = false;
+    }
+
     function replaceInput(form, selector, newElement) {
         const input = form.querySelector(selector);
         if (input) {
