@@ -134,7 +134,15 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Create a select element with proper value/text mapping
+    /**
+     * Create a select element with proper value/text mapping and custom entry option
+     * @param {string} name Select element name
+     * @param {Array} options Array of options
+     * @param {string} valueField Field to use for option values
+     * @param {string} textField Field to use for option text
+     * @param {string} selectedValue Value to select by default
+     * @returns {HTMLSelectElement} The created select element
+     */
     function createSelectElement(name, options, valueField, textField, selectedValue = '') {
         const select = document.createElement('select');
         select.className = 'form-select';
@@ -160,6 +168,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             select.appendChild(opt);
+        });
+        
+        // Enhance the select with custom option capabilities
+        enhanceSelectWithCustomOption(select, name, function onCustomEntryAdded(entityType, value) {
+            console.log(`Added new ${entityType}: ${value}`);
+            
+            if (name === 'muscle_group' || name === 'equipment' || name === 'exercise_name') {
+                enhanceSelectWithCustomOption(select, name, function onCustomEntryAdded(entityType, value) {
+                    console.log(`Added new ${entityType}: ${value}`);
+                    
+                    // Refresh exercise data if needed
+                    if (entityType === 'muscle_group' || entityType === 'equipment') {
+                        // Refresh exercise data after adding a new muscle group or equipment
+                        loadExerciseData()
+                            .then(() => {
+                                console.log('Exercise data refreshed after adding new ' + entityType);
+                            })
+                            .catch(error => {
+                                console.error('Failed to refresh exercise data:', error);
+                            });
+                    }
+                });
+            }
         });
         
         return select;
@@ -224,6 +255,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isRestoringState) {
                 console.log('Muscle group changed to:', muscleGroupSelect.value);
                 
+                // If "Add New..." is selected, we don't need to filter equipment
+                if (muscleGroupSelect.value.startsWith('add_new_')) {
+                    return;
+                }
+                
                 // Get all equipment used with this muscle group
                 const compatibleEquipment = exerciseData.exercises
                     .filter(ex => ex.muscle_group === muscleGroupSelect.value)
@@ -234,11 +270,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('Compatible equipment:', uniqueEquipment);
                 
-                // Reset equipment dropdown
-                resetSelect(equipmentSelect);
-                
-                // Filter equipment options
-                filterSelectOptions(equipmentSelect, uniqueEquipment);
+                // If no compatible equipment is found, don't filter the equipment dropdown
+                // This allows users to add equipment for new muscle groups
+                if (uniqueEquipment.length === 0) {
+                    console.log('No compatible equipment found, keeping all options');
+                    // Just reset the equipment dropdown without filtering
+                    resetSelect(equipmentSelect);
+                } else {
+                    // Reset equipment dropdown then filter
+                    resetSelect(equipmentSelect);
+                    filterSelectOptions(equipmentSelect, uniqueEquipment);
+                }
                 
                 // Reset exercise dropdown
                 resetSelect(exerciseSelect);
@@ -249,6 +291,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isRestoringState) {
                 console.log('Equipment changed to:', equipmentSelect.value);
                 
+                // If "Add New..." is selected, we don't need to filter exercises
+                if (equipmentSelect.value.startsWith('add_new_')) {
+                    return;
+                }
+                
                 // Filter exercises by both muscle group and equipment
                 const filteredExercises = exerciseData.exercises
                     .filter(ex => 
@@ -256,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ex.equipment === equipmentSelect.value
                     )
                     .map(ex => ex.exercise_name);
-                    
+                        
                 console.log('Compatible exercises:', filteredExercises);
                 
                 // Reset exercise dropdown
@@ -326,21 +373,40 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * UTILITY FUNCTIONS
      */
-    // Helper function to filter select options
+    /**
+     * Filter select options while preserving the "Add New..." option
+     * @param {HTMLSelectElement} selectElement - The select element to filter
+     * @param {Array} allowedValues - Values to keep visible
+     */
     function filterSelectOptions(selectElement, allowedValues) {
         const options = selectElement.options;
+        let hasVisibleOptions = false;
         
-        // Skip the first option (the placeholder)
+        // Skip the first option (the placeholder) and handle all regular options
         for (let i = 1; i < options.length; i++) {
+            // Skip the "Add New..." option - we'll handle it separately
+            if (options[i].value.startsWith('add_new_')) {
+                continue;
+            }
+            
             if (!allowedValues.includes(options[i].value)) {
                 options[i].disabled = true;
                 options[i].style.display = 'none';
             } else {
                 options[i].disabled = false;
                 options[i].style.display = '';
+                hasVisibleOptions = true;
             }
         }
-    }
+        
+        // Always make sure the "Add New..." option is visible
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value.startsWith('add_new_')) {
+                options[i].disabled = false;
+                options[i].style.display = '';
+            }
+        }
+    }       
 
     // Helper function to select option by value
     function selectOptionByValue(selectElement, value) {
@@ -356,15 +422,21 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
-    // Helper to reset a select to its default state
+    /**
+     * Reset a select to its default state while preserving the "Add New..." option
+     * @param {HTMLSelectElement} selectElement - The select element to reset
+     */
     function resetSelect(selectElement) {
         selectElement.selectedIndex = 0;
         
         // Re-enable all options
         const options = selectElement.options;
         for (let i = 1; i < options.length; i++) {
-            options[i].disabled = false;
-            options[i].style.display = '';
+            // Always preserve the visibility of the "Add New..." option
+            if (!options[i].value.startsWith('add_new_')) {
+                options[i].disabled = false;
+                options[i].style.display = '';
+            }
         }
     }
 
@@ -721,6 +793,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+
     function showMessage(title, message, type, container = null) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
@@ -747,6 +820,189 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 3000);
     }
+
+    /**
+     * Adds a "Add New..." option to a select element that triggers a prompt when selected
+     * @param {HTMLSelectElement} selectElement - The select element to enhance
+     * @param {string} entityType - Type of entity ('muscle_group', 'equipment', or 'exercise_name')
+     * @param {Function} onCustomEntryAdded - Callback when custom entry is added
+     */
+    function enhanceSelectWithCustomOption(selectElement, entityType, onCustomEntryAdded) {
+        if (!selectElement) return;
+        
+        // Check if this select is already enhanced
+        if (selectElement.querySelector('.custom-option')) return;
+        
+        // Create the "Add New..." option and add it to the end of the select
+        const addNewOption = document.createElement('option');
+        addNewOption.value = 'add_new_' + entityType;
+        addNewOption.textContent = '➕ Add New ' + formatEntityType(entityType) + '...';
+        addNewOption.classList.add('text-primary', 'custom-option');
+        selectElement.appendChild(addNewOption);
+        
+        // Add event listener to show prompt when "Add New..." is selected
+        selectElement.addEventListener('change', function() {
+            if (this.value === 'add_new_' + entityType) {
+                // Show prompt to get new value
+                const newValue = prompt('Enter new ' + formatEntityType(entityType) + ' name:');
+                
+                // If user entered a value
+                if (newValue && newValue.trim()) {
+                    const trimmedValue = newValue.trim();
+                    
+                    // Call API to create new entity
+                    createCustomEntity(entityType, trimmedValue)
+                        .then(result => {
+                            if (result.success) {
+                                // Add the new option to the select
+                                const newOption = document.createElement('option');
+                                newOption.value = trimmedValue;
+                                newOption.textContent = trimmedValue;
+                                
+                                // Insert before the "Add New..." option
+                                selectElement.insertBefore(newOption, addNewOption);
+                                
+                                // Select the new option
+                                newOption.selected = true;
+                                
+                                // Call the callback function
+                                if (onCustomEntryAdded) {
+                                    onCustomEntryAdded(entityType, trimmedValue);
+                                }
+                                
+                                // Show success message
+                                alert('Added successfully!');
+                            } else {
+                                alert(result.message || 'Failed to add item');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Error: ' + (error.message || 'Failed to add item'));
+                        });
+                } else {
+                    // User cancelled or entered empty value - reset the select
+                    selectElement.selectedIndex = 0;
+                }
+            }
+        });
+    }
+
+    /**
+     * Create a custom entity via API
+     * @param {string} entityType - Type of entity ('muscle_group', 'equipment', or 'exercise_name')
+     * @param {string} name - Name of the new entity
+     * @returns {Promise} - Promise that resolves to the API response
+     */
+    function createCustomEntity(entityType, name) {
+        let endpoint = 'api/exercise_library.php?action=add_' + entityType;
+        
+        // If this is an exercise, we need additional data
+        if (entityType === 'exercise_name') {
+            // Get the selected muscle group and equipment
+            const muscleGroupSelect = document.activeElement.closest('form').querySelector('[name="muscle_group"]');
+            const equipmentSelect = document.activeElement.closest('form').querySelector('[name="equipment"]');
+            
+            if (!muscleGroupSelect || !equipmentSelect) {
+                return Promise.reject('Cannot add exercise: muscle group or equipment not found');
+            }
+            
+            // Make sure they are selected and not "Add New..."
+            if (!muscleGroupSelect.value || muscleGroupSelect.value.startsWith('add_new_') ||
+                !equipmentSelect.value || equipmentSelect.value.startsWith('add_new_')) {
+                return Promise.reject('Cannot add exercise: please select muscle group and equipment first');
+            }
+            
+            return fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    muscle_group: muscleGroupSelect.value,
+                    equipment: equipmentSelect.value
+                })
+            }).then(response => response.json());
+        }
+        
+        // For muscle groups and equipment, just send the name
+        return fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: name })
+        }).then(response => response.json());
+    }
+
+    /**
+     * Format entity type for display
+     * @param {string} entityType - Type of entity
+     * @returns {string} - Formatted entity type
+     */
+    function formatEntityType(entityType) {
+        switch (entityType) {
+            case 'muscle_group':
+                return 'Muscle Group';
+            case 'equipment':
+                return 'Equipment';
+            case 'exercise_name':
+                return 'Exercise';
+            default:
+                return entityType.replace('_', ' ');
+        }
+    }
+
+    /**
+     * Show a local message near an element
+     * @param {HTMLElement} element - Element to show message near
+     * @param {string} message - Message to show
+     * @param {string} type - Message type ('success', 'danger', 'warning')
+     */
+    function showLocalMessage(element, message, type) {
+        // Remove any existing message
+        const existingMessage = element.parentNode.querySelector('.local-message');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        
+        // Create new message
+        const messageElement = document.createElement('div');
+        messageElement.className = `local-message alert alert-${type} mt-2 py-1 px-2 small`;
+        messageElement.textContent = message;
+        
+        // Insert after the element
+        element.parentNode.insertBefore(messageElement, element.nextSibling);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (messageElement.parentNode) {
+                messageElement.remove();
+            }
+        }, 3000);
+    }
+
+    // Add the CSS for custom option styling
+    document.head.insertAdjacentHTML('beforeend', `
+    <style>
+        .custom-option {
+            font-style: italic;
+            border-top: 1px dashed #ccc;
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+        
+        .custom-option-input {
+            display: flex;
+            align-items: center;
+        }
+        
+        .local-message {
+            font-size: 0.85rem;
+        }
+    </style>
+    `);
 
     // Start initialization
     init();
