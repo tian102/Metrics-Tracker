@@ -1,3 +1,8 @@
+/**
+ * Training Page JavaScript
+ * Handles functionality for the training metrics page
+ */
+
 document.addEventListener('DOMContentLoaded', function() {
     // Global state for exercise data
     let exerciseData = {
@@ -47,6 +52,9 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * FORM SETUP
      */
+    // Flag to prevent cascade events while restoring state
+    let isRestoringState = false;
+
     function setupForms() {
         setupNewExerciseForm();
         setupExistingExerciseForms();
@@ -65,8 +73,85 @@ document.addEventListener('DOMContentLoaded', function() {
         replaceInput(form, '[name="equipment"]', equipmentSelect);
         replaceInput(form, '[name="exercise_name"]', exerciseSelect);
 
-        // Setup cascading filters
+        // Set up the cascading filters
         setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect);
+        
+        // Restore previous selections without triggering cascades
+        restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect);
+    }
+    
+    function restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect) {
+        const lastMuscleGroup = sessionStorage.getItem('lastMuscleGroup');
+        const lastEquipment = sessionStorage.getItem('lastEquipment');
+        const lastExercise = sessionStorage.getItem('lastExercise');
+        
+        if (!lastMuscleGroup) return;
+        
+        try {
+            // Disable cascading events temporarily
+            isRestoringState = true;
+            
+            // Step 1: Set the muscle group and manually filter equipment options
+            muscleGroupSelect.value = lastMuscleGroup;
+            const selectedMuscleGroup = exerciseData.muscleGroups.find(mg => mg.id === parseInt(lastMuscleGroup))?.name;
+            
+            // Step 2: Manually filter equipment options based on muscle group
+            const filteredEquipment = lastMuscleGroup ? 
+                exerciseData.equipment.filter(eq => 
+                    exerciseData.exercises.some(ex => 
+                        ex.muscle_group === selectedMuscleGroup &&
+                        ex.equipment === eq.name
+                    )
+                ) : exerciseData.equipment;
+            
+            // Update equipment select without triggering cascades
+            updateSelectWithoutCascade(equipmentSelect, filteredEquipment, 'equipment');
+            
+            if (lastEquipment) {
+                // Set equipment value
+                equipmentSelect.value = lastEquipment;
+                const selectedEquipment = exerciseData.equipment.find(eq => eq.id === parseInt(lastEquipment))?.name;
+                
+                // Step 3: Manually filter exercise options based on muscle group and equipment
+                const filteredExercises = exerciseData.exercises.filter(ex => 
+                    ex.muscle_group === selectedMuscleGroup && 
+                    ex.equipment === selectedEquipment
+                );
+                
+                // Update exercise select without triggering cascades
+                updateSelectWithoutCascade(exerciseSelect, filteredExercises, 'exercise');
+                
+                if (lastExercise) {
+                    // Set exercise value
+                    exerciseSelect.value = lastExercise;
+                }
+            }
+        } finally {
+            // Always re-enable cascading events
+            isRestoringState = false;
+        }
+    }
+    
+    function updateSelectWithoutCascade(select, options, type) {
+        // Save current value
+        const currentValue = select.value;
+        
+        // Clear options
+        select.innerHTML = '';
+        select.appendChild(new Option('Select ' + select.name.replace('_', ' '), ''));
+        
+        // Add new options
+        options.forEach(option => {
+            const optionText = type === 'exercise' ? option.exercise_name : option.name;
+            const optionValue = option.id;
+            const opt = new Option(optionText, optionValue);
+            select.appendChild(opt);
+        });
+        
+        // Restore current value if it's still valid
+        if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+            select.value = currentValue;
+        }
     }
 
     function setupExistingExerciseForms() {
@@ -116,11 +201,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect) {
         muscleGroupSelect.addEventListener('change', () => {
+            // Skip if we're currently restoring state
+            if (isRestoringState) return;
+            
             updateEquipmentOptions(muscleGroupSelect.value, equipmentSelect);
             updateExerciseOptions(muscleGroupSelect.value, equipmentSelect.value, exerciseSelect);
         });
 
         equipmentSelect.addEventListener('change', () => {
+            // Skip if we're currently restoring state
+            if (isRestoringState) return;
+            
             updateExerciseOptions(muscleGroupSelect.value, equipmentSelect.value, exerciseSelect);
         });
     }
@@ -194,6 +285,62 @@ document.addEventListener('DOMContentLoaded', function() {
      * EVENT HANDLERS
      */
     function setupEventHandlers() {
+        // Session form submission
+        const sessionForm = document.getElementById('sessionForm');
+        if (sessionForm) {
+            sessionForm.addEventListener('submit', handleSessionFormSubmit);
+        }
+        
+        // Add a reset button to the exercise form
+    const resetFormBtn = document.createElement('button');
+    resetFormBtn.type = 'button';
+    resetFormBtn.className = 'btn btn-outline-secondary ms-2';
+    resetFormBtn.textContent = 'Reset Form';
+    resetFormBtn.addEventListener('click', function() {
+        // Clear sessionStorage
+        sessionStorage.removeItem('lastMuscleGroup');
+        sessionStorage.removeItem('lastEquipment');
+        sessionStorage.removeItem('lastExercise');
+        
+        // Reset form fields
+        const form = document.getElementById('newExerciseForm');
+        form.reset();
+        
+        // Reset dropdowns to initial state
+        const muscleGroupSelect = form.querySelector('[name="muscle_group"]');
+        const equipmentSelect = form.querySelector('[name="equipment"]');
+        const exerciseSelect = form.querySelector('[name="exercise_name"]');
+        
+        if (muscleGroupSelect) muscleGroupSelect.selectedIndex = 0;
+        if (equipmentSelect) {
+            // Clear and reset equipment options
+            equipmentSelect.innerHTML = '';
+            equipmentSelect.appendChild(new Option('Select equipment', ''));
+        }
+        if (exerciseSelect) {
+            // Clear and reset exercise options
+            exerciseSelect.innerHTML = '';
+            exerciseSelect.appendChild(new Option('Select exercise name', ''));
+        }
+        
+        // Reset range sliders
+        form.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.value = 5;
+            const valueDisplay = slider.nextElementSibling;
+            if (valueDisplay && valueDisplay.classList.contains('range-value')) {
+                valueDisplay.textContent = '5';
+            }
+        });
+        
+        showMessage('Form Reset', 'Form has been reset to default values', 'info');
+    });
+    
+    // Add the reset button to the form buttons
+    const formButtons = document.querySelector('#newExerciseForm .form-group:last-child');
+    if (formButtons) {
+        formButtons.appendChild(resetFormBtn);
+    }
+    
         // Add Exercise button handler
         const addExerciseBtn = document.getElementById('addExerciseBtn');
         const newExerciseForm = document.getElementById('newExerciseForm');
@@ -202,49 +349,91 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault(); // Prevent default button action
                 addExerciseBtn.style.display = 'none';
                 newExerciseForm.style.display = 'block';
+                
+                // After the form is visible, restore previous selections for dropdowns
+                const muscleGroupSelect = newExerciseForm.querySelector('[name="muscle_group"]');
+                const equipmentSelect = newExerciseForm.querySelector('[name="equipment"]');
+                const exerciseSelect = newExerciseForm.querySelector('[name="exercise_name"]');
+                
+                if (muscleGroupSelect && equipmentSelect && exerciseSelect) {
+                    restorePreviousSelections(muscleGroupSelect, equipmentSelect, exerciseSelect);
+                }
+                
                 newExerciseForm.scrollIntoView({ behavior: 'smooth' });
             });
         }
     
-        // Cancel Add Exercise button handler
-        const cancelAddExercise = document.getElementById('cancelAddExercise');
-        if (cancelAddExercise && newExerciseForm && addExerciseBtn) {
-            cancelAddExercise.addEventListener('click', (e) => {
-                e.preventDefault(); // Prevent default button action
-                newExerciseForm.style.display = 'none';
-                addExerciseBtn.style.display = 'inline-block';
-            });
-        }
-    
-        // Form submission handlers
-        const createSessionForm = document.getElementById('createSessionForm');
-        if (createSessionForm) {
-            createSessionForm.addEventListener('submit', handleCreateSession);
-        }
-    
-        document.querySelectorAll('form.workout-detail-form').forEach(form => {
-            form.addEventListener('submit', handleFormSubmit);
-        });
-    
+        // Exercise form submission
         if (newExerciseForm) {
             newExerciseForm.addEventListener('submit', handleNewExercise);
         }
+    
+        // Update existing exercise forms
+        document.querySelectorAll('.workout-detail-form').forEach(form => {
+            form.addEventListener('submit', handleUpdateExercise);
+        });
     
         // Delete exercise button handlers
         document.querySelectorAll('.delete-exercise-btn').forEach(btn => {
             btn.addEventListener('click', handleDeleteExercise);
         });
+        
+        // Delete session button handler
+        const deleteSessionBtn = document.getElementById('deleteSessionBtn');
+        if (deleteSessionBtn) {
+            deleteSessionBtn.addEventListener('click', handleDeleteSession);
+        }
+
+        // Handle sliders to update displayed values
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', function() {
+                const valueDisplay = this.nextElementSibling;
+                if (valueDisplay && valueDisplay.classList.contains('range-value')) {
+                    valueDisplay.textContent = this.value;
+                }
+            });
+        });
     }
 
-    // Add new handler for Create Session
-    function handleCreateSession(event) {
+    function handleSessionFormSubmit(event) {
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-
-        fetch('api/workout_sessions.php', {
-            method: 'POST',
+        const data = {};
+        
+        // Process form data
+        formData.forEach((value, key) => {
+            // Process date and time fields
+            if (key === 'training_start_time' || key === 'training_end_time') {
+                // We'll process these later
+                data[key] = value;
+            } else {
+                data[key] = value;
+            }
+        });
+        
+        // Process training times
+        if (data.date && data.training_start_time) {
+            data.training_start = data.date + ' ' + data.training_start_time + ':00';
+            delete data.training_start_time;
+        } else {
+            data.training_start = null;
+        }
+        
+        if (data.date && data.training_end_time) {
+            data.training_end = data.date + ' ' + data.training_end_time + ':00';
+            delete data.training_end_time;
+        } else {
+            data.training_end = null;
+        }
+        
+        // Determine if we're creating a new session or updating an existing one
+        const isUpdate = data.id ? true : false;
+        const endpoint = 'api/training_sessions.php';
+        const method = isUpdate ? 'PUT' : 'POST';
+        
+        fetch(endpoint, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -253,27 +442,51 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                showMessage('Success!', 'Session created successfully.', 'success');
-                // Redirect to the new session page if needed
-                if (result.session_id) {
-                    window.location.href = `training.php?session=${result.session_id}`;
+                showMessage('Success!', result.message, 'success');
+                // If this was a new session, redirect to the session page
+                if (!isUpdate && result.session_id) {
+                    window.location.href = `training.php?id=${result.session_id}`;
                 }
             } else {
-                showMessage('Error', result.message || 'Failed to create session.', 'error');
+                showMessage('Error', result.message || 'Failed to save session.', 'danger');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showMessage('Error', 'Network error occurred. Please try again.', 'error');
+            showMessage('Error', 'Network error occurred. Please try again.', 'danger');
         });
     }
 
-    // Add new handler for New Exercise
     function handleNewExercise(event) {
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        
+        // Store the current selections before submitting
+        const muscleGroupSelect = form.querySelector('[name="muscle_group"]');
+        const exerciseSelect = form.querySelector('[name="exercise_name"]');
+        const equipmentSelect = form.querySelector('[name="equipment"]');
+        
+        // Get text values from the selected options
+        const muscleGroupText = muscleGroupSelect.options[muscleGroupSelect.selectedIndex]?.text || '';
+        const exerciseText = exerciseSelect.options[exerciseSelect.selectedIndex]?.text || '';
+        const equipmentText = equipmentSelect.options[equipmentSelect.selectedIndex]?.text || '';
+        
+        // Save IDs for backend processing
+        const muscleGroupId = muscleGroupSelect.value;
+        const exerciseId = exerciseSelect.value;
+        const equipmentId = equipmentSelect.value;
+        
+        // Format the muscle_group and exercise_name as user-friendly strings for display
+        data.muscle_group = muscleGroupText;
+        data.exercise_name = exerciseText;
+        data.equipment = equipmentText;
+        
+        // Store selections in sessionStorage to restore later
+        sessionStorage.setItem('lastMuscleGroup', muscleGroupId);
+        sessionStorage.setItem('lastEquipment', equipmentId);
+        sessionStorage.setItem('lastExercise', exerciseId);
 
         fetch('api/workout_details.php', {
             method: 'POST',
@@ -286,29 +499,53 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(result => {
             if (result.success) {
                 showMessage('Success!', 'Exercise added successfully.', 'success');
-                form.reset();
+                
+                // Don't reset form - this will keep our selections
+                // Instead, just hide the form
+                const addExerciseBtn = document.getElementById('addExerciseBtn');
                 form.style.display = 'none';
-                document.getElementById('addExerciseBtn').style.display = 'inline-block';
-                // Optionally refresh the exercise list
-                location.reload();
+                addExerciseBtn.style.display = 'inline-block';
+                
+                // Reload the page to show the new exercise, but after a longer delay
+                // to let the user see the success message
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
             } else {
-                showMessage('Error', result.message || 'Failed to add exercise.', 'error');
+                showMessage('Error', result.message || 'Failed to add exercise.', 'danger');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showMessage('Error', 'Network error occurred. Please try again.', 'error');
+            showMessage('Error', 'Network error occurred. Please try again.', 'danger');
         });
     }
 
-    function handleFormSubmit(event) {
+    function handleUpdateExercise(event) {
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        
+        // Get text values from the selected options
+        const muscleGroupSelect = form.querySelector('[name="muscle_group"]');
+        const exerciseSelect = form.querySelector('[name="exercise_name"]');
+        const equipmentSelect = form.querySelector('[name="equipment"]');
+        
+        if (muscleGroupSelect && exerciseSelect && equipmentSelect) {
+            // Get text values from the selected options
+            const muscleGroupText = muscleGroupSelect.options[muscleGroupSelect.selectedIndex]?.text || '';
+            const exerciseText = exerciseSelect.options[exerciseSelect.selectedIndex]?.text || '';
+            const equipmentText = equipmentSelect.options[equipmentSelect.selectedIndex]?.text || '';
+            
+            // Format the muscle_group and exercise_name as user-friendly strings
+            data.muscle_group = muscleGroupText;
+            data.exercise_name = exerciseText;
+            data.equipment = equipmentText;
+        }
 
         fetch('api/workout_details.php', {
-            method: 'POST',
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -317,28 +554,28 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                showMessage('Success!', 'Exercise details saved successfully.', 'success');
-                if (form.id === 'newExerciseForm') {
-                    form.reset();
-                    form.style.display = 'none';
-                    document.getElementById('addExerciseBtn').style.display = 'inline-block';
-                }
+                showMessage('Success!', 'Exercise updated successfully.', 'success', form);
             } else {
-                showMessage('Error', result.message || 'Failed to save exercise details.', 'error');
+                showMessage('Error', result.message || 'Failed to update exercise.', 'danger', form);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showMessage('Error', 'Network error occurred. Please try again.', 'error');
+            showMessage('Error', 'Network error occurred. Please try again.', 'danger', form);
         });
     }
 
     function handleDeleteExercise(event) {
-        const btn = event.target;
+        const btn = event.target.closest('.delete-exercise-btn');
         const container = btn.closest('.exercise-container');
         const exerciseId = container.dataset.id;
 
         if (confirm('Are you sure you want to delete this exercise? This action cannot be undone.')) {
+            // Clear form state data when deleting
+            sessionStorage.removeItem('lastMuscleGroup');
+            sessionStorage.removeItem('lastEquipment');
+            sessionStorage.removeItem('lastExercise');
+            
             fetch('api/workout_details.php', {
                 method: 'DELETE',
                 headers: {
@@ -352,28 +589,70 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.remove();
                     showMessage('Success!', 'Exercise deleted successfully.', 'success');
                 } else {
-                    showMessage('Error', result.message || 'Failed to delete exercise.', 'error');
+                    showMessage('Error', result.message || 'Failed to delete exercise.', 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showMessage('Error', 'Network error occurred. Please try again.', 'error');
+                showMessage('Error', 'Network error occurred. Please try again.', 'danger');
+            });
+        }
+    }
+    
+    function handleDeleteSession(event) {
+        if (confirm('Are you sure you want to delete this entire training session? This will also delete all exercises in this session.')) {
+            const sessionId = document.getElementById('sessionId').value;
+            
+            fetch('api/training_sessions.php', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id: sessionId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showMessage('Success!', 'Training session deleted successfully.', 'success');
+                    // Redirect to the training page after a short delay
+                    setTimeout(() => {
+                        window.location.href = 'training.php';
+                    }, 1500);
+                } else {
+                    showMessage('Error', result.message || 'Failed to delete training session.', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Error', 'Network error occurred. Please try again.', 'danger');
             });
         }
     }
 
-    function showMessage(title, message, type) {
+    function showMessage(title, message, type, container = null) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.innerHTML = `
             <strong>${title}</strong> ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         `;
-        document.querySelector('.container').insertAdjacentElement('afterbegin', alertDiv);
+        
+        if (container && container.querySelector('.workout-alert-message')) {
+            // If this is an exercise form, use its dedicated alert container
+            const alertContainer = container.querySelector('.workout-alert-message');
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+            alertContainer.style.display = 'block';
+        } else {
+            // Otherwise use the global alert container
+            document.querySelector('.container').insertAdjacentElement('afterbegin', alertDiv);
+        }
         
         // Auto-dismiss after 3 seconds
         setTimeout(() => {
-            alertDiv.remove();
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
         }, 3000);
     }
 
