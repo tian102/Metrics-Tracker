@@ -14,6 +14,17 @@ $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : $endDate;
 $dailyMetrics = getDailyMetricsRange($startDate, $endDate);
 $trainingSessions = getTrainingSessionsRange($startDate, $endDate);
 
+// Get active tab from request if available
+$activeTab = isset($_GET['active_tab']) ? $_GET['active_tab'] : 'daily-metrics-tab';
+
+// Tab IDs should match what's in your HTML - adjust if necessary
+$validTabIds = ['daily-metrics-tab', 'nutrition-tab', 'training-tab']; 
+
+// Validate active tab ID to prevent XSS
+if (!in_array($activeTab, $validTabIds)) {
+    $activeTab = 'daily-metrics-tab'; // Default to first tab if invalid
+}
+
 // Process training sessions to get workout details
 $workoutDetails = [];
 foreach ($trainingSessions as $session) {
@@ -34,44 +45,76 @@ foreach ($trainingSessions as $session) {
                 
                 <!-- Date filter form -->
                 <div class="d-flex flex-wrap gap-2">
-                    <form id="dateRangeForm" class="d-flex flex-wrap gap-2">
-                        <div class="input-group">
-                            <span class="input-group-text">From</span>
-                            <input type="date" id="startDate" name="start_date" class="form-control" value="<?= $startDate ?>">
+                    <!-- Modified date range form that preserves the active tab -->
+                    <form id="dateRangeForm" class="mb-4">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate" name="start_date" 
+                                    value="<?php echo isset($_GET['start_date']) ? htmlspecialchars($_GET['start_date']) : date('Y-m-d', strtotime('-30 days')); ?>" 
+                                    max="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="endDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="endDate" name="end_date" 
+                                    value="<?php echo isset($_GET['end_date']) ? htmlspecialchars($_GET['end_date']) : date('Y-m-d'); ?>" 
+                                    max="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary w-100">Filter</button>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <span class="input-group-text">To</span>
-                            <input type="date" id="endDate" name="end_date" class="form-control" value="<?= $endDate ?>">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <!-- Hidden field for tracking active tab - will be set by JavaScript -->
+                        <input type="hidden" name="active_tab" value="<?php echo htmlspecialchars($activeTab); ?>">
                     </form>
                 </div>
             </div>
             
             <div class="card-body">
                 <!-- Tabs for different chart categories -->
-                <ul class="nav nav-tabs mb-4" id="chartTabs" role="tablist">
+                <ul class="nav nav-tabs" id="visualTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="daily-tab" data-bs-toggle="tab" 
-                            data-bs-target="#daily-charts" type="button" role="tab" 
-                            aria-controls="daily-charts" aria-selected="true">Daily Metrics</button>
+                        <button class="nav-link <?php echo ($activeTab == 'daily-metrics-tab') ? 'active' : ''; ?>" 
+                                id="daily-metrics-tab" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#daily-metrics" 
+                                type="button" 
+                                role="tab" 
+                                aria-controls="daily-metrics" 
+                                aria-selected="<?php echo ($activeTab == 'daily-metrics-tab') ? 'true' : 'false'; ?>">
+                            Daily Metrics
+                        </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="nutrition-tab" data-bs-toggle="tab" 
-                            data-bs-target="#nutrition-charts" type="button" role="tab" 
-                            aria-controls="nutrition-charts" aria-selected="false">Nutrition</button>
+                        <button class="nav-link <?php echo ($activeTab == 'nutrition-tab') ? 'active' : ''; ?>" 
+                                id="nutrition-tab" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#nutrition" 
+                                type="button" 
+                                role="tab" 
+                                aria-controls="nutrition" 
+                                aria-selected="<?php echo ($activeTab == 'nutrition-tab') ? 'true' : 'false'; ?>">
+                            Nutrition
+                        </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="training-tab" data-bs-toggle="tab" 
-                            data-bs-target="#training-charts" type="button" role="tab" 
-                            aria-controls="training-charts" aria-selected="false">Training</button>
+                        <button class="nav-link <?php echo ($activeTab == 'training-tab') ? 'active' : ''; ?>" 
+                                id="training-tab" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#training" 
+                                type="button" 
+                                role="tab" 
+                                aria-controls="training" 
+                                aria-selected="<?php echo ($activeTab == 'training-tab') ? 'true' : 'false'; ?>">
+                            Training
+                        </button>
                     </li>
                 </ul>
                 
                 <!-- Tab content -->
-                <div class="tab-content" id="chartTabContent">
+                <div class="tab-content" id="visualTabsContent">
                     <!-- Daily Metrics Tab -->
-                    <div class="tab-pane fade show active" id="daily-charts" role="tabpanel" aria-labelledby="daily-tab">
+                    <div class="tab-pane fade <?php echo ($activeTab == 'daily-metrics-tab') ? 'show active' : ''; ?>" id="daily-metrics" role="tabpanel" aria-labelledby="daily-metrics-tab">
                         <div class="row">
                             <!-- Weight Progress Chart -->
                             <div class="col-md-6">
@@ -118,7 +161,7 @@ foreach ($trainingSessions as $session) {
                     </div>
                     
                     <!-- Nutrition Tab -->
-                    <div class="tab-pane fade" id="nutrition-charts" role="tabpanel" aria-labelledby="nutrition-tab">
+                    <div class="tab-pane fade <?php echo ($activeTab == 'nutrition-tab') ? 'show active' : ''; ?>" id="nutrition" role="tabpanel" aria-labelledby="nutrition-tab">
                         <div class="row">
                             <!-- Calories Chart -->
                             <div class="col-md-6">
@@ -165,7 +208,7 @@ foreach ($trainingSessions as $session) {
                     </div>
                     
                     <!-- Training Tab -->
-                    <div class="tab-pane fade" id="training-charts" role="tabpanel" aria-labelledby="training-tab">
+                    <div class="tab-pane fade <?php echo ($activeTab == 'training-tab') ? 'show active' : ''; ?>" id="training" role="tabpanel" aria-labelledby="training-tab">
                         <div class="row">
                             <!-- Training Volume by Muscle Group -->
                             <div class="col-md-6">
@@ -244,6 +287,7 @@ foreach ($trainingSessions as $session) {
             </div>
         </div>
     </div>
+    
 </div>
 
 <!-- Visualization JavaScript -->
@@ -262,5 +306,51 @@ document.addEventListener('DOMContentLoaded', function() {
     processVisualizationData(dailyMetricsData, trainingSessionsData, workoutDetailsData);
 });
 </script>
-
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get tab elements
+    const tabLinks = document.querySelectorAll('.nav-tabs .nav-link');
+    const dateRangeForm = document.getElementById('dateRangeForm');
+    
+    // Add hidden input field to the form if it doesn't exist
+    let activeTabInput = dateRangeForm.querySelector('input[name="active_tab"]');
+    if (!activeTabInput) {
+        activeTabInput = document.createElement('input');
+        activeTabInput.type = 'hidden';
+        activeTabInput.name = 'active_tab';
+        dateRangeForm.appendChild(activeTabInput);
+    }
+    
+    // Set initial value from URL parameter or default to first tab
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTabId = urlParams.get('active_tab') || 'daily-metrics-tab';
+    
+    // Activate the correct tab on page load
+    const tabToActivate = document.getElementById(activeTabId);
+    if (tabToActivate) {
+        // Create a new Bootstrap tab instance and show it
+        const tab = new bootstrap.Tab(tabToActivate);
+        tab.show();
+        
+        // Set the hidden input value
+        activeTabInput.value = activeTabId;
+    }
+    
+    // Update hidden input when a tab is clicked
+    tabLinks.forEach(tabLink => {
+        tabLink.addEventListener('click', function() {
+            activeTabInput.value = this.id;
+        });
+    });
+    
+    // Update form action to preserve the active tab when submitting
+    dateRangeForm.addEventListener('submit', function(e) {
+        // Make sure we have the current active tab
+        const currentActiveTab = document.querySelector('.nav-tabs .nav-link.active');
+        if (currentActiveTab) {
+            activeTabInput.value = currentActiveTab.id;
+        }
+    });
+});
+</script>
 <?php require_once 'includes/footer.php'; ?>
