@@ -96,6 +96,9 @@ if (isset($_GET['success']) && $_GET['success'] == '1') {
 // Page title
 $pageTitle = 'My Profile';
 
+// Determine active tab from URL parameter
+$activeTab = isset($_GET['tab']) ? $_GET['tab'] : 'profile-tab';
+
 // Include header
 require_once 'includes/header.php';
 ?>
@@ -127,10 +130,16 @@ require_once 'includes/header.php';
                 <!-- Nav tabs -->
                 <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="true">Profile Information</button>
+                        <button class="nav-link <?php echo $activeTab == 'profile-tab' ? 'active' : ''; ?>" 
+                                id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" 
+                                role="tab" aria-controls="profile" 
+                                aria-selected="<?php echo $activeTab == 'profile-tab' ? 'true' : 'false'; ?>">Profile Information</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="theme-tab" data-bs-toggle="tab" data-bs-target="#theme" type="button" role="tab" aria-controls="theme" aria-selected="false">Appearance</button>
+                        <button class="nav-link <?php echo $activeTab == 'theme-tab' ? 'active' : ''; ?>" 
+                                id="theme-tab" data-bs-toggle="tab" data-bs-target="#theme" type="button" 
+                                role="tab" aria-controls="theme" 
+                                aria-selected="<?php echo $activeTab == 'theme-tab' ? 'true' : 'false'; ?>">Appearance</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab" aria-controls="password" aria-selected="false">Change Password</button>
@@ -143,7 +152,8 @@ require_once 'includes/header.php';
                 <!-- Tab panes -->
                 <div class="tab-content">
                     <!-- Profile Information Tab -->
-                    <div class="tab-pane fade show active" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+                    <div class="tab-pane fade <?php echo $activeTab == 'profile-tab' ? 'show active' : ''; ?>" 
+                         id="profile" role="tabpanel" aria-labelledby="profile-tab">
                         <form action="profile.php" method="POST">
                             <input type="hidden" name="update_profile" value="1">
                             
@@ -215,7 +225,8 @@ require_once 'includes/header.php';
                     </div>
                     
                     <!-- Theme Selection Tab -->
-                    <div class="tab-pane fade" id="theme" role="tabpanel" aria-labelledby="theme-tab">
+                    <div class="tab-pane fade <?php echo $activeTab == 'theme-tab' ? 'show active' : ''; ?>" 
+                         id="theme" role="tabpanel" aria-labelledby="theme-tab">
                         <form action="profile.php" method="POST">
                             <input type="hidden" name="update_profile" value="1">
                             <input type="hidden" name="id" value="<?php echo $_SESSION['user_id']; ?>">
@@ -263,57 +274,6 @@ require_once 'includes/header.php';
                                 </div>
                                 
                                 <div class="col-md-3 col-sm-6 mb-4">
-                                    <div class="card theme-card <?php echo ($user['theme'] == 'blue') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_blue').checked = true;">
-                                        <div class="card-body text-center p-4" style="height: 120px; background-color: #e8f0fe; color: #1a73e8;">
-                                            <h5>Blue</h5>
-                                            <p class="mb-0"><small>Material design</small></p>
-                                        </div>
-                                        <div class="card-footer">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="theme" id="theme_blue" value="blue" <?php echo ($user['theme'] == 'blue') ? 'checked' : ''; ?>>
-                                                <label class="form-check-label" for="theme_blue">
-                                                    Blue
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 col-sm-6 mb-4">
-                                    <div class="card theme-card <?php echo ($user['theme'] == 'green') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_green').checked = true;">
-                                        <div class="card-body text-center p-4" style="height: 120px; background-color: #f0f7ee; color: #51a351;">
-                                            <h5>Green</h5>
-                                            <p class="mb-0"><small>Nature inspired</small></p>
-                                        </div>
-                                        <div class="card-footer">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="theme" id="theme_green" value="green" <?php echo ($user['theme'] == 'green') ? 'checked' : ''; ?>>
-                                                <label class="form-check-label" for="theme_green">
-                                                    Green
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 col-sm-6 mb-4">
-                                    <div class="card theme-card <?php echo ($user['theme'] == 'purple') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_purple').checked = true;">
-                                        <div class="card-body text-center p-4" style="height: 120px; background-color: #f8f5fe; color: #673ab7;">
-                                            <h5>Purple</h5>
-                                            <p class="mb-0"><small>Vibrant & creative</small></p>
-                                        </div>
-                                        <div class="card-footer">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="theme" id="theme_purple" value="purple" <?php echo ($user['theme'] == 'purple') ? 'checked' : ''; ?>>
-                                                <label class="form-check-label" for="theme_purple">
-                                                    Purple
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 col-sm-6 mb-4">
                                     <div class="card theme-card <?php echo ($user['theme'] == 'tech') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_tech').checked = true;">
                                         <div class="card-body text-center p-4" style="height: 120px; background-color: #1a1b1e; color: #61dafb;">
                                             <h5>Tech</h5>
@@ -329,11 +289,28 @@ require_once 'includes/header.php';
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <div class="col-md-3 col-sm-6 mb-4">
+                                    <div class="card theme-card <?php echo ($user['theme'] == 'modern') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_modern').checked = true;">
+                                        <div class="card-body text-center p-4" style="height: 120px; background: linear-gradient(135deg, #1a73e8, #61dafb);">
+                                            <h5 class="text-white">Modern</h5>
+                                            <p class="mb-0 text-white"><small>Clean & fresh</small></p>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="theme" id="theme_modern" value="modern" <?php echo ($user['theme'] == 'modern') ? 'checked' : ''; ?>>
+                                                <label class="form-check-label" for="theme_modern">
+                                                    Modern
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="row mt-3">
                                 <div class="col-12">
-                                    <button type="submit" class="btn btn-primary">Save Theme</button>
+                                    <!-- Remove the Save Theme button -->
                                 </div>
                             </div>
                         </form>

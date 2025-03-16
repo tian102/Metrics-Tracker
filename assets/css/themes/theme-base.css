@@ -1,10 +1,47 @@
 /* Base Theme Variables */
 :root {
-    --theme-bg: #ffffff;
-    --theme-text: #212529;
+    /* Primary Colors */
+    --primary-rgb: 26, 115, 232;
+    --primary: rgb(var(--primary-rgb));
+    --primary-light: #e8f0fe;
+    --primary-dark: #1557b0;
+    
+    /* Accent Colors */
+    --accent-rgb: 97, 218, 251;
+    --accent: rgb(var(--accent-rgb));
+    --accent-light: #e6f6fe;
+    --accent-dark: #0591c9;
+    
+    /* Status Colors */
+    --success-rgb: 0, 184, 148;
+    --success: rgb(var(--success-rgb));
+    --warning-rgb: 255, 217, 61;
+    --warning: rgb(var(--warning-rgb));
+    --danger-rgb: 255, 85, 85;
+    --danger: rgb(var(--danger-rgb));
+    --info-rgb: 108, 92, 231;
+    --info: rgb(var(--info-rgb));
+    
+    /* Neutral Colors */
+    --neutral-50: #f8f9fa;
+    --neutral-100: #f0f1f3;
+    --neutral-200: #e9ecef;
+    --neutral-300: #dee2e6;
+    --neutral-400: #ced4da;
+    --neutral-500: #adb5bd;
+    --neutral-600: #6c757d;
+    --neutral-700: #495057;
+    --neutral-800: #343a40;
+    --neutral-900: #212529;
+    
+    /* Theme Specific */
+    --theme-bg: var(--neutral-50);
+    --theme-text: var(--neutral-900);
     --theme-card-bg: #ffffff;
-    --theme-border: rgba(0,0,0,.125);
-    --theme-hover-bg: #f8f9fa;
+    --theme-border: var(--neutral-200);
+    --theme-hover-bg: var(--neutral-100);
+    
+    /* Animation */
     --theme-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

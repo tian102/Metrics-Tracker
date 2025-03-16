@@ -1,11 +1,10 @@
 /* Modern Tech Theme */
 :root {
-    --primary-color: #61dafb;
-    --secondary-color: #646cff;
-    --success-color: #00b894;
-    --danger-color: #ff5555;
-    --warning-color: #ffd93d;
-    --info-color: #6c5ce7;
+    /* Override Primary Colors */
+    --primary-rgb: 97, 218, 251;
+    --accent-rgb: 100, 108, 255;
+    
+    /* Theme Colors */
     --bg-color: #1a1b1e;
     --text-color: #e2e8f0;
     --text-muted: #94a3b8;
@@ -14,7 +13,7 @@
     --card-header-bg: #26272b;
     --nav-bg: #1a1b1e;
     --nav-text: #e2e8f0;
-    --nav-link-hover: #61dafb;
+    --nav-link-hover: rgb(var(--primary-rgb));
     --input-bg: #2a2b2f;
     --input-border: #373a3f;
     --chart-grid: #2a2b2f;
@@ -53,7 +52,7 @@ body {
 
 .dropdown-item:hover {
     background-color: rgba(97, 218, 251, 0.1);
-    color: var(--primary-color);
+    color: rgb(var(--primary-rgb));
 }
 
 .form-control, .form-select {
@@ -64,7 +63,7 @@ body {
 
 .form-control:focus, .form-select:focus {
     background-color: var(--input-bg);
-    border-color: var(--primary-color);
+    border-color: rgb(var(--primary-rgb));
     color: var(--text-color);
     box-shadow: 0 0 0 0.25rem rgba(97, 218, 251, 0.25);
 }
@@ -90,5 +89,5 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-color);
+    background: rgb(var(--primary-rgb));
 }

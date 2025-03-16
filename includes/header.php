@@ -19,10 +19,16 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
     <!-- Theme CSS -->
     <?php
     $theme = 'default';
-    if (isLoggedIn() && !empty($currentUser['theme'])) {
+    if (isset($currentUser) && !empty($currentUser['theme'])) {
         $theme = $currentUser['theme'];
     }
+    // Add modern theme CSS link
     echo '<link rel="stylesheet" href="assets/css/themes/' . htmlspecialchars($theme) . '.css">';
+    
+    // Load additional theme-specific styles for modern theme
+    if ($theme === 'modern') {
+        echo '<link rel="stylesheet" href="assets/css/themes/theme-base.css">';
+    }
     ?>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -48,18 +54,23 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                     </a>
                                 </li>
                                 <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" id="dailyTrackingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-calendar-day"></i> Daily Tracking
+                                    <a class="nav-link dropdown-toggle" href="#" id="trackDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-plus-circle"></i> Track
                                     </a>
-                                    <ul class="dropdown-menu" aria-labelledby="dailyTrackingDropdown">
+                                    <ul class="dropdown-menu" aria-labelledby="trackDropdown">
                                         <li><a class="dropdown-item" href="daily.php"><i class="fas fa-heartbeat"></i> Health</a></li>
                                         <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell"></i> Training</a></li>
                                     </ul>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'visualize.php') ? 'active' : ''; ?>" href="visualize.php">
-                                        <i class="fas fa-chart-bar"></i> Analytics
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" id="dataDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-chart-bar"></i> Data
                                     </a>
+                                    <ul class="dropdown-menu" aria-labelledby="dataDropdown">
+                                        <li><a class="dropdown-item" href="visualize.php"><i class="fas fa-chart-line"></i> Charts</a></li>
+                                        <li><a class="dropdown-item" href="correlations.php"><i class="fas fa-brain"></i> Insights</a></li>
+                                        <li><a class="dropdown-item" href="exercises.php"><i class="fas fa-running"></i> Exercise Library</a></li>
+                                    </ul>
                                 </li>
                                 <!-- Replace the text separator with a border -->
                                 <li class="nav-item d-none d-lg-block">
@@ -71,8 +82,7 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                         <?php echo htmlspecialchars($currentUser['username']); ?>
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                        <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user-cog"></i> My Profile</a></li>
-                                        <li><a class="dropdown-item" href="dashboard_settings.php"><i class="fas fa-columns"></i> Customize Dashboard</a></li>
+                                        <li><a class="dropdown-item" href="profile.php"><i class="fas fa-cog"></i> Settings</a></li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item" href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                                     </ul>

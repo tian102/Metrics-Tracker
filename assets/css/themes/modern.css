@@ -1,0 +1,45 @@
+/* Modern Light Theme */
+:root {
+    /* Override Primary Colors */
+    --primary-rgb: 26, 115, 232;
+    --accent-rgb: 97, 218, 251;
+    
+    /* Theme Colors */
+    --bg-color: var(--neutral-100);
+    --text-color: var(--neutral-900);
+    --text-muted: var(--neutral-600);
+    --card-bg: #ffffff;
+    --card-border: var(--neutral-200);
+    --card-header-bg: #ffffff;
+    --nav-bg: #ffffff;
+    --nav-text: var(--neutral-700);
+    --nav-link-hover: var(--primary);
+    --input-bg: #ffffff;
+    --input-border: var(--neutral-300);
+    --chart-grid: var(--neutral-200);
+}
+
+/* Theme Specific Styles */
+.card, .metric-card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-color: var(--card-border);
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, var(--primary), var(--accent));
+    border: none;
+}
+
+.nav-tabs .nav-link.active {
+    border-bottom: 2px solid var(--primary);
+}
+
+.form-control:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
+}
+
+/* Gradient Accents */
+.progress-bar, .badge-primary {
+    background: linear-gradient(45deg, var(--primary), var(--accent));
+}

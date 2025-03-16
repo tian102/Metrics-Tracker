@@ -1503,7 +1503,6 @@ body {
 /* Responsive Tables */
 .table-responsive {
     margin-bottom: 1rem;
-    -webkit-overflow-scrolling: touch;
 }
 
 /* Mobile-Friendly Modals */

@@ -8,17 +8,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const themeCards = document.querySelectorAll('.theme-card');
     
     themeCards.forEach(card => {
-        card.addEventListener('click', function() {
+        card.addEventListener('click', async function() {
             // Find the radio input within this card
             const radioInput = this.querySelector('input[type="radio"]');
             if (radioInput) {
+                // Update visual selection
                 radioInput.checked = true;
-                
-                // Remove border-primary class from all cards
                 themeCards.forEach(c => c.classList.remove('border-primary'));
-                
-                // Add border-primary class to selected card
                 this.classList.add('border-primary');
+
+                // Get the selected theme
+                const selectedTheme = radioInput.value;
+                const formData = new FormData();
+                formData.append('theme', selectedTheme);
+
+                try {
+                    // Send AJAX request to update theme
+                    const response = await fetch('update_theme.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Create new link element
+                        const newThemeLink = document.createElement('link');
+                        newThemeLink.rel = 'stylesheet';
+                        newThemeLink.href = `assets/css/themes/${selectedTheme}.css`;
+
+                        // Replace existing theme stylesheet
+                        const oldThemeLink = document.querySelector('link[href*="themes/"]');
+                        if (oldThemeLink) {
+                            oldThemeLink.parentNode.replaceChild(newThemeLink, oldThemeLink);
+                        } else {
+                            document.head.appendChild(newThemeLink);
+                        }
+
+                        // Get the current tab
+                        const activeTab = document.querySelector('#profileTabs .nav-link.active');
+                        const tabId = activeTab ? activeTab.id : 'profile-tab';
+                        
+                        // Reload page with tab parameter
+                        window.location.href = 'profile.php?tab=' + tabId;
+                    }
+                } catch (error) {
+                    console.error('Error updating theme:', error);
+                }
             }
         });
     });
