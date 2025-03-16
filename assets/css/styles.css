@@ -796,6 +796,201 @@ input[list] {
 .text-truncate-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;  /* Add standard property */
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-overflow: ellipsis; /* Add for better truncation appearance */
+}
+
+/* Ensure proper chart wrapper spacing */
+#exerciseProgressChartWrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Tab content spacing */
+.tab-content {
+    padding-top: 1.5rem;
+}
+
+/* Row spacing using Bootstrap's gap utility */
+.row.g-4 {
+    --bs-gutter-y: 1.5rem;
+}
+
+/* Remove any margin bottom from the last row */
+.tab-pane .row:last-child {
+    margin-bottom: 0;
+}
+
+/* Base card styles */
+.metric-card {
+    height: 100%;
+    background-color: #fff;
+    border: 1px solid rgba(0,0,0,.125);
+    border-radius: .25rem;
+    margin-bottom: 0;
+}
+
+.metric-card .card-header {
+    background-color: transparent;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 1rem;
+}
+
+.metric-card .card-body {
+    padding: 1rem;
+}
+
+/* Chart container styles */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Tab content layout */
+.tab-content {
+    padding-top: 1.5rem;
+}
+
+.tab-pane .row {
+    margin-bottom: 1.5rem;
+}
+
+.tab-pane .row:last-child {
+    margin-bottom: 0;
+}
+
+/* Bootstrap gap utility enhancement */
+.row.g-4 {
+    --bs-gutter-x: 1.5rem;
+    --bs-gutter-y: 1.5rem;
+}
+
+/* Remove conflicting margins */
+.row > * {
+    margin-bottom: 0;
+}
+
+/* Base chart container styles */
+.chart-container {
+    position: relative;
+    height: 300px !important; /* Force consistent height */
+    width: 100%;
+    margin-bottom: 0;
+}
+
+/* Ensure chart canvas fills container */
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Consistent card body padding */
+.metric-card .card-body {
+    padding: 1rem;
+    height: auto;
+}
+
+/* Remove any inline height styles */
+#trainingDurationChart,
+#stimulusFatigueChart,
+#muscleGroupVolumeChart,
+#exerciseProgressChart {
+    height: 100% !important;
+}
+
+/* Dashboard Widgets */
+.widget-container {
+    margin-bottom: 1.5rem;
+}
+
+/* Form Elements */
+.form-select-with-add {
+    position: relative;
+}
+
+/* Utilities */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;  /* Add standard property */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add for better truncation appearance */
+}
+
+/* Widget size dropdown styles */
+.widget-actions .dropdown {
+    position: static;
+}
+
+.size-dropdown-toggle {
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.size-dropdown-toggle:hover {
+    opacity: 0.8;
+}
+
+.dropdown-menu .size-option {
+    cursor: pointer;
+}
+
+/* Prevent text selection during drag */
+.widget-dragging * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+
+/* Ensure proper spacing in widget actions */
+.widget-actions {
+    gap: 0.5rem;
+}
+
+/* Widget size-specific styles */
+.dashboard-widget.col-md-6 .chart-container {
+    height: 300px;
+}
+
+.dashboard-widget.col-12 .chart-container {
+    height: 400px;
+}
+
+/* Improved drag and drop handling */
+.widget-handle {
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.widget-ghost {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+}
+
+.widget-ghost .card {
+    border: 2px dashed #0d6efd;
+}
+
+.is-dragging {
+    cursor: grabbing;
+}
+
+/* Size badge styling */
+.widget-actions .dropdown-toggle {
+    cursor: pointer;
+}
+
+.widget-actions .badge {
+    font-weight: normal;
+    padding: 0.5em 0.8em;
 }

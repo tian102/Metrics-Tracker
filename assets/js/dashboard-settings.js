@@ -140,68 +140,114 @@ function loadCurrentWidgets() {
  */
 function renderWidgets(widgets) {
     const container = document.getElementById('widgetContainer');
-    container.innerHTML = '';
-    
-    if (widgets.length === 0) {
-        container.innerHTML = `
-            <div class="alert alert-info">
-                You don't have any widgets configured yet. Add some from the options above.
-            </div>
-        `;
-        return;
-    }
+    if (!container) return;
     
     // Create a row for the widgets
-    let html = '<div class="row" id="widgetRow">';
+    let html = '<div class="row g-4" id="widgetRow">';
     
     widgets.forEach(widget => {
-        const sizeClass = widget.widget_size === 'large' ? 'col-md-12' : 'col-md-6 col-xl-3';
-        
         html += `
-        <div class="dashboard-widget ${sizeClass} mb-4" data-id="${widget.id}" data-position="${widget.widget_position}" data-type="${widget.widget_type}" data-size="${widget.widget_size}">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center widget-handle" style="cursor: grab;">
+        <div class="dashboard-widget ${getSizeClass(widget.widget_size)}" data-id="${widget.id}" data-position="${widget.widget_position}">
+            <div class="card metric-card">
+                <div class="card-header d-flex justify-content-between align-items-center widget-handle">
                     <div class="d-flex align-items-center">
                         <i class="fas fa-grip-vertical me-2 text-muted"></i>
                         <h5 class="mb-0">${widget.widget_title}</h5>
                     </div>
-                    <div class="widget-actions">
-                        <button type="button" class="btn btn-sm btn-outline-secondary resize-widget-btn me-2" title="Toggle widget size">
-                            <i class="fas ${widget.widget_size === 'large' ? 'fa-compress-alt' : 'fa-expand-alt'}"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-widget-btn">
+                    <div class="widget-actions d-flex align-items-center">
+                        <div class="dropdown me-2">
+                            <span class="badge bg-secondary dropdown-toggle cursor-pointer" data-bs-toggle="dropdown">
+                                ${getSizeLabel(widget.widget_size)}
+                            </span>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium">Medium (Half Width)</a></li>
+                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium-full">Medium (Full Width)</a></li>
+                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="large">Large (Full Width)</a></li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger remove-widget-btn">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
-                <div class="card-body widget-preview">
-                    <div class="text-center py-5">
-                        <i class="fas ${getWidgetIcon(widget.widget_type)} fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">${getWidgetDescription(widget.widget_type)}</p>
-                        <span class="badge ${widget.widget_size === 'large' ? 'bg-info' : 'bg-secondary'} mt-2 widget-size-badge">
-                            ${widget.widget_size === 'large' ? 'Large (Full Width)' : 'Medium (Half Width)'}
-                        </span>
+                <div class="card-body">
+                    <div class="widget-content">
+                        <div class="text-center py-4">
+                            <i class="fas ${getWidgetIcon(widget.widget_type)} fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">${getWidgetDescription(widget.widget_type)}</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        `;
+        </div>`;
     });
     
     html += '</div>';
     container.innerHTML = html;
-    
-    // Add event listeners for the resize buttons after rendering
-    document.querySelectorAll('.resize-widget-btn').forEach(button => {
-        button.addEventListener('click', function(e) {
+
+    // Initialize Sortable after rendering widgets
+    initializeSortable();
+
+    // Add event listeners for the size options
+    document.querySelectorAll('.size-option').forEach(option => {
+        option.addEventListener('click', function(e) {
             e.preventDefault();
-            e.stopPropagation();
-            const widgetElement = this.closest('.dashboard-widget');
-            const widgetId = widgetElement.dataset.id;
-            const currentSize = widgetElement.dataset.size;
-            const newSize = currentSize === 'large' ? 'medium' : 'large';
+            const widgetId = this.dataset.widgetId;
+            const newSize = this.dataset.size;
             resizeWidget(widgetId, newSize);
         });
+    });
+}
+
+// Helper function to get the appropriate badge class for widget size
+function getSizeBadgeClass(size) {
+    switch(size) {
+        case 'large':
+            return 'bg-info';
+        case 'medium-full':
+            return 'bg-primary';
+        default: // medium (half width)
+            return 'bg-secondary';
+    }
+}
+
+// Helper function to get the label for widget size
+function getSizeLabel(size) {
+    // Update size label mapping
+    const labels = {
+        'medium': 'Medium (Half Width)',
+        'medium-full': 'Medium (Full Width)',
+        'large': 'Large (Full Width)'
+    };
+    return labels[size] || 'Medium (Half Width)';
+}
+
+// Update the resizeWidget function to handle the new size option
+function resizeWidget(widgetId, newSize) {
+    fetch('api/dashboard.php?action=update_widget', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            id: widgetId,
+            widget_size: newSize
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Success - reload widgets to reflect new size
+            let successMessage = 'Widget size updated successfully';
+            showAlert('widgetAlert', 'success', successMessage);
+            loadCurrentWidgets();
+        } else {
+            showAlert('widgetAlert', 'danger', 'Failed to resize widget: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('widgetAlert', 'danger', 'Error resizing widget. Please try again.');
     });
 }
 
@@ -387,16 +433,15 @@ function resizeWidget(widgetId, newSize) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            // Success - reload widgets to reflect new size
-            showAlert('widgetAlert', 'success', `Widget ${newSize === 'large' ? 'expanded' : 'reduced'} successfully`);
-            loadCurrentWidgets();
+            loadCurrentWidgets(); // Refresh all widgets
+            showAlert('widgetAlert', 'success', 'Widget size updated successfully');
         } else {
-            showAlert('widgetAlert', 'danger', 'Failed to resize widget: ' + result.message);
+            showAlert('widgetAlert', 'danger', 'Failed to update widget size');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('widgetAlert', 'danger', 'Error resizing widget. Please try again.');
+        showAlert('widgetAlert', 'danger', 'Error updating widget size');
     });
 }
 
@@ -528,5 +573,90 @@ document.head.insertAdjacentHTML('beforeend', `
         -webkit-user-select: none !important;
         -moz-user-select: none !important;
     }
+
+    /* Style for the size badge dropdown */
+    .size-dropdown-toggle {
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        transition: background-color 0.2s;
+    }
+
+    .size-dropdown-toggle:hover {
+        opacity: 0.9;
+    }
+
+    /* Dropdown menu styling */
+    .size-dropdown-menu {
+        min-width: 180px;
+    }
+
+    .size-dropdown-menu .dropdown-item {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .size-dropdown-menu .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Active size in dropdown */
+    .size-dropdown-menu .dropdown-item.active {
+        font-weight: bold;
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+    }
+
+    /* Make badge more interactive looking */
+    .badge.dropdown-toggle::after {
+        display: inline-block;
+        margin-left: 0.5em;
+        vertical-align: middle;
+        content: "";
+        border-top: 0.3em solid;
+        border-right: 0.3em solid transparent;
+        border-bottom: 0;
+        border-left: 0.3em solid transparent;
+    }
+
+    /* Cursor pointer for all interactive elements */
+    .cursor-pointer {
+        cursor: pointer;
+    }
 </style>
 `);
+
+// Update getSizeClass function
+function getSizeClass(size) {
+    // Update size class mapping
+    const classes = {
+        'medium': 'col-md-6',        // Medium (Half Width)
+        'medium-full': 'col-12',     // Medium (Full Width)
+        'large': 'col-12'           // Large (Full Width)
+    };
+    return classes[size] || 'col-md-6';
+}
+
+// Update the initializeSortable function
+function initializeSortable() {
+    const widgetRow = document.getElementById('widgetRow');
+    if (!widgetRow) return;
+
+    new Sortable(widgetRow, {
+        animation: 150,
+        ghostClass: 'widget-ghost',
+        handle: '.widget-handle',
+        draggable: '.dashboard-widget',
+        filter: '.widget-actions, .dropdown-toggle, .size-option', // Prevent drag from these elements
+        preventOnFilter: true,
+        onStart: function(evt) {
+            document.body.classList.add('widget-dragging');
+            evt.item.classList.add('is-dragging');
+        },
+        onEnd: function(evt) {
+            document.body.classList.remove('widget-dragging');
+            evt.item.classList.remove('is-dragging');
+            updateWidgetPositions();
+        }
+    });
+}
