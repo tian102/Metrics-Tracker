@@ -142,7 +142,6 @@ function renderWidgets(widgets) {
     const container = document.getElementById('widgetContainer');
     if (!container) return;
     
-    // Create a row for the widgets
     let html = '<div class="row g-4" id="widgetRow">';
     
     widgets.forEach(widget => {
@@ -154,28 +153,27 @@ function renderWidgets(widgets) {
                         <i class="fas fa-grip-vertical me-2 text-muted"></i>
                         <h5 class="mb-0">${widget.widget_title}</h5>
                     </div>
-                    <div class="widget-actions d-flex align-items-center">
-                        <div class="dropdown me-2">
-                            <span class="badge bg-secondary dropdown-toggle cursor-pointer" data-bs-toggle="dropdown">
-                                ${getSizeLabel(widget.widget_size)}
-                            </span>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium">Medium (Half Width)</a></li>
-                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium-full">Medium (Full Width)</a></li>
-                                <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="large">Large (Full Width)</a></li>
-                            </ul>
-                        </div>
+                    <div class="widget-actions">
                         <button class="btn btn-sm btn-outline-danger remove-widget-btn">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="widget-content">
+                <div class="card-body d-flex flex-column">
+                    <div class="widget-content flex-grow-1 mb-3">
                         <div class="text-center py-4">
                             <i class="fas ${getWidgetIcon(widget.widget_type)} fa-2x text-muted mb-2"></i>
                             <p class="text-muted mb-0">${getWidgetDescription(widget.widget_type)}</p>
                         </div>
+                    </div>
+                    <div class="dropdown text-center">
+                        <span class="badge bg-secondary dropdown-toggle cursor-pointer" data-bs-toggle="dropdown">
+                            ${getSizeLabel(widget.widget_size)}
+                        </span>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium">Medium (Half Width)</a></li>
+                            <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="large">Large (Full Width)</a></li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -185,7 +183,6 @@ function renderWidgets(widgets) {
     html += '</div>';
     container.innerHTML = html;
 
-    // Initialize Sortable after rendering widgets
     initializeSortable();
 
     // Add event listeners for the size options
@@ -213,10 +210,8 @@ function getSizeBadgeClass(size) {
 
 // Helper function to get the label for widget size
 function getSizeLabel(size) {
-    // Update size label mapping
     const labels = {
         'medium': 'Medium (Half Width)',
-        'medium-full': 'Medium (Full Width)',
         'large': 'Large (Full Width)'
     };
     return labels[size] || 'Medium (Half Width)';
@@ -224,6 +219,14 @@ function getSizeLabel(size) {
 
 // Update the resizeWidget function to handle the new size option
 function resizeWidget(widgetId, newSize) {
+    // Validate size before sending request
+    const validSizes = ['medium', 'large'];
+    if (!validSizes.includes(newSize)) {
+        console.error('Invalid size:', newSize);
+        showAlert('widgetAlert', 'danger', 'Invalid widget size');
+        return;
+    }
+
     fetch('api/dashboard.php?action=update_widget', {
         method: 'POST',
         headers: {
@@ -237,17 +240,15 @@ function resizeWidget(widgetId, newSize) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            // Success - reload widgets to reflect new size
-            let successMessage = 'Widget size updated successfully';
-            showAlert('widgetAlert', 'success', successMessage);
             loadCurrentWidgets();
+            showAlert('widgetAlert', 'success', 'Widget size updated successfully');
         } else {
-            showAlert('widgetAlert', 'danger', 'Failed to resize widget: ' + result.message);
+            showAlert('widgetAlert', 'danger', 'Failed to update widget size');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('widgetAlert', 'danger', 'Error resizing widget. Please try again.');
+        showAlert('widgetAlert', 'danger', 'Error updating widget size');
     });
 }
 
@@ -420,6 +421,14 @@ function removeWidget(widgetId) {
  * Resize a widget (toggle between medium and large)
  */
 function resizeWidget(widgetId, newSize) {
+    // Validate size before sending request
+    const validSizes = ['medium', 'large'];
+    if (!validSizes.includes(newSize)) {
+        console.error('Invalid size:', newSize);
+        showAlert('widgetAlert', 'danger', 'Invalid widget size');
+        return;
+    }
+
     fetch('api/dashboard.php?action=update_widget', {
         method: 'POST',
         headers: {
@@ -628,13 +637,11 @@ document.head.insertAdjacentHTML('beforeend', `
 
 // Update getSizeClass function
 function getSizeClass(size) {
-    // Update size class mapping
     const classes = {
-        'medium': 'col-md-6',        // Medium (Half Width)
-        'medium-full': 'col-12',     // Medium (Full Width)
-        'large': 'col-12'           // Large (Full Width)
+        'medium': 'col-xl-3 col-lg-6',  // Medium (Half Width) - 4 per row on xl, 2 per row on lg
+        'large': 'col-12'              // Large (Full Width)
     };
-    return classes[size] || 'col-md-6';
+    return classes[size] || 'col-xl-3 col-lg-6';
 }
 
 // Update the initializeSortable function
