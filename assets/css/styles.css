@@ -1,3 +1,13 @@
+/* Core Layout */
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --info-color: #0dcaf0;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+}
+
 /* Custom styles to work with Bootstrap */
 :root {
     --bs-primary: #3498db;
@@ -10,6 +20,7 @@
     --bs-info: #3498db;
 }
 
+/* Base Elements */
 body {
     min-height: 100vh;
     display: flex;
@@ -18,7 +29,8 @@ body {
 }
 
 main {
-    flex: 1 0 auto;
+    flex: 1;
+    padding: 2rem 0;
 }
 
 /* Custom card styles */
@@ -28,6 +40,7 @@ main {
     border: 1px solid rgba(0,0,0,.125);
     border-radius: .25rem;
     margin-bottom: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .metric-card .card-header {
@@ -48,8 +61,8 @@ main {
 }
 
 .metric-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
 }
 
 /* Range slider customization */
@@ -75,8 +88,9 @@ input[type="range"] {
 /* Chart containers */
 .chart-container {
     position: relative;
-    height: 300px !important; /* Force consistent height */
+    height: 300px;
     width: 100%;
+    margin: 0 auto;
     margin-bottom: 0; /* Remove margin from chart container since we're using card margin */
 }
 
@@ -440,6 +454,32 @@ tr:hover {
     }
 }
 
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px;
+    }
+    
+    .metric-card {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .chart-container {
+        height: 200px;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    
+    .btn-group-responsive {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
 /* Alert Messages */
 .alert {
     padding: 1rem;
@@ -540,9 +580,9 @@ tr:hover {
 
 /* Style for widget container when being dragged */
 .widget-ghost {
-    opacity: 0.5;
+    opacity: 0.6;
     background-color: #f8f9fa;
-    border: 1px dashed #0d6efd;
+    border: 2px dashed var(--primary-color);
 }
 
 /* Make range sliders more consistent across browsers */
@@ -736,4 +776,26 @@ input[list] {
 #muscleGroupVolumeChart,
 #exerciseProgressChart {
     height: 100% !important;
+}
+
+/* Dashboard Widgets */
+.widget-container {
+    margin-bottom: 1.5rem;
+}
+
+/* Form Elements */
+.form-select-with-add {
+    position: relative;
+}
+
+/* Utilities */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }

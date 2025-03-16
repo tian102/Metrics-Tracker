@@ -380,7 +380,16 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
 <datalist id="exerciseNameList"></datalist>
 <datalist id="equipmentList"></datalist>
 
-
+<div class="exercise-container">
+    <div class="metric-card">
+        <div class="card-header">
+            <h5 class="card-title">Exercise Details</h5>
+        </div>
+        <div class="card-body">
+            <!-- Exercise form content -->
+        </div>
+    </div>
+</div>
 
 <script src="assets/js/training.js"></script>
 
