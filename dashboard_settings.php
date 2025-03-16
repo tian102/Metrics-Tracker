@@ -66,256 +66,407 @@ if (empty($widgets)) {
 $pageTitle = 'Dashboard Settings';
 ?>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                <h2 class="mb-2 mb-md-0">Dashboard Settings</h2>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="index.php" class="btn btn-outline-primary">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
-                </div>
-            </div>
-            <div class="card-body">
-                <p>Customize your dashboard by selecting which widgets to display and how they're arranged.</p>
+<!-- Page Header -->
+<div class="container-fluid py-4 bg-light mb-4 shadow-sm">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <h1 class="h2 mb-3 mb-md-0">Dashboard Settings</h1>
+            <div>
+                <a href="index.php" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
             </div>
         </div>
+        <p class="text-muted mb-0 mt-2">Customize your dashboard layout, widgets, and display preferences</p>
     </div>
 </div>
 
-<div class="row">
-    <!-- Dashboard Preferences -->
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h3 class="mb-0">General Preferences</h3>
-            </div>
-            <div class="card-body">
-                <form id="preferencesForm">
-                    <div class="mb-3">
-                        <label for="defaultView" class="form-label">Default Time Period</label>
-                        <select class="form-select" id="defaultView" name="default_view">
-                            <option value="daily" <?= $preferences['default_view'] === 'daily' ? 'selected' : '' ?>>Daily</option>
-                            <option value="weekly" <?= $preferences['default_view'] === 'weekly' ? 'selected' : '' ?>>Weekly</option>
-                            <option value="monthly" <?= $preferences['default_view'] === 'monthly' ? 'selected' : '' ?>>Monthly</option>
-                        </select>
-                        <div class="form-text">Choose how far back to show metrics by default.</div>
+<div class="container mb-5">
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#layout" type="button" role="tab" aria-selected="true">
+                <i class="fas fa-columns me-2"></i>Layout
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="widgets-tab" data-bs-toggle="tab" data-bs-target="#widgets" type="button" role="tab" aria-selected="false">
+                <i class="fas fa-th-large me-2"></i>Add Widgets
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="preferences-tab" data-bs-toggle="tab" data-bs-target="#preferences" type="button" role="tab" aria-selected="false">
+                <i class="fas fa-cog me-2"></i>Preferences
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content" id="settingsTabsContent">
+        <!-- Layout Tab -->
+        <div class="tab-pane fade show active" id="layout" role="tabpanel" aria-labelledby="layout-tab">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="h5 mb-0">Current Dashboard Layout</h3>
+                        <button class="btn btn-sm btn-outline-secondary" id="resetLayoutBtn">
+                            <i class="fas fa-undo me-1"></i> Reset to Default
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>Drag and drop widgets to reorder them. Use the remove button to delete widgets from your dashboard.
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">Save Preferences</button>
-                </form>
-                
-                <!-- Alert for preferences form -->
-                <div id="preferencesAlert" class="alert mt-3" style="display: none;"></div>
+                    <?php if (empty($widgets)): ?>
+                        <div class="alert alert-warning text-center py-4">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                            <p class="mb-0">You don't have any widgets configured yet. Add some from the "Add Widgets" tab.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="dashboard-preview" id="widgetContainer">
+                            <!-- This will be populated by JavaScript with the draggable widgets -->
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
-    </div>
-    
-    <!-- Available Widgets -->
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h3 class="mb-0">Add Widgets</h3>
-            </div>
-            <div class="card-body">
-                <div class="available-widgets">
-                    <div class="row">
-                        <!-- Metric Widgets -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Sleep Stats</h5>
-                                    <p class="card-text">Shows your average sleep duration and quality.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="sleep_stats" 
-                                            data-title="Sleep" 
-                                            data-size="medium">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+        
+        <!-- Widgets Tab -->
+        <div class="tab-pane fade" id="widgets" role="tabpanel" aria-labelledby="widgets-tab">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h3 class="h5 mb-0">Available Widgets</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Organize widgets by category -->
+                    <ul class="nav nav-pills mb-4" id="widget-categories" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="metrics-tab" data-bs-toggle="pill" data-bs-target="#metrics-widgets" type="button" role="tab" aria-selected="true">
+                                Metric Stats
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="charts-tab" data-bs-toggle="pill" data-bs-target="#chart-widgets" type="button" role="tab" aria-selected="false">
+                                Charts
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tables-tab" data-bs-toggle="pill" data-bs-target="#table-widgets" type="button" role="tab" aria-selected="false">
+                                Tables & Lists
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="advanced-tab" data-bs-toggle="pill" data-bs-target="#advanced-widgets" type="button" role="tab" aria-selected="false">
+                                Advanced
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="widget-categoriesContent">
+                        <!-- Metric Stats Widgets -->
+                        <div class="tab-pane fade show active" id="metrics-widgets" role="tabpanel" aria-labelledby="metrics-tab">
+                            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-bed text-primary fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Sleep Stats</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Average sleep duration and quality metrics.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="sleep_stats" 
+                                                    data-title="Sleep" 
+                                                    data-size="medium">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Energy & Motivation</h5>
-                                    <p class="card-text">Shows your average energy, stress, and motivation levels.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="energy_stats" 
-                                            data-title="Energy & Motivation" 
-                                            data-size="medium">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-bolt text-warning fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Energy & Motivation</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Average energy, stress, and motivation levels.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="energy_stats" 
+                                                    data-title="Energy & Motivation" 
+                                                    data-size="medium">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Nutrition Stats</h5>
-                                    <p class="card-text">Shows your average calories and macronutrients.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="nutrition_stats" 
-                                            data-title="Nutrition" 
-                                            data-size="medium">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-apple-alt text-success fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Nutrition Stats</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Average calories and macronutrient breakdown.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="nutrition_stats" 
+                                                    data-title="Nutrition" 
+                                                    data-size="medium">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Training Stats</h5>
-                                    <p class="card-text">Shows your training session count and volume.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="training_stats" 
-                                            data-title="Training" 
-                                            data-size="medium">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-dumbbell text-danger fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Training Stats</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Training session count and volume metrics.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="training_stats" 
+                                                    data-title="Training" 
+                                                    data-size="medium">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Chart Widgets -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Weight Progress Chart</h5>
-                                    <p class="card-text">Graph of your weight measurements over time.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="weight_chart" 
-                                            data-title="Weight Progress" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                        <div class="tab-pane fade" id="chart-widgets" role="tabpanel" aria-labelledby="charts-tab">
+                            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-weight text-primary fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Weight Progress</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Line chart tracking weight over time.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="weight_chart" 
+                                                    data-title="Weight Progress" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Sleep Chart</h5>
-                                    <p class="card-text">Graph of your sleep duration over time.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="sleep_chart" 
-                                            data-title="Sleep Duration" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-info bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-bed text-info fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Sleep Duration</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Chart showing sleep duration trends over time.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="sleep_chart" 
+                                                    data-title="Sleep Duration" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Energy Chart</h5>
-                                    <p class="card-text">Graph of your energy, stress, and motivation over time.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="energy_chart" 
-                                            data-title="Energy Levels" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-bolt text-warning fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Energy Levels</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Chart tracking energy, stress, and motivation levels.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="energy_chart" 
+                                                    data-title="Energy Levels" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Nutrition Chart</h5>
-                                    <p class="card-text">Graph of your caloric and macronutrient intake over time.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="nutrition_chart" 
-                                            data-title="Nutrition Intake" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-utensils text-success fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Nutrition Chart</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Visual breakdown of caloric and macronutrient intake.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="nutrition_chart" 
+                                                    data-title="Nutrition Intake" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Table Widgets -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Recent Daily Metrics</h5>
-                                    <p class="card-text">Table of your most recent daily metrics entries.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="recent_daily" 
-                                            data-title="Recent Daily Metrics" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                        <div class="tab-pane fade" id="table-widgets" role="tabpanel" aria-labelledby="tables-tab">
+                            <div class="row row-cols-1 row-cols-md-2 g-4">
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-info bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-calendar-day text-info fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Recent Daily Metrics</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Table showing your most recent daily metric entries.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="recent_daily" 
+                                                    data-title="Recent Daily Metrics" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Recent Training Sessions</h5>
-                                    <p class="card-text">Table of your most recent training sessions.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="recent_training" 
-                                            data-title="Recent Training Sessions" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-dumbbell text-danger fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Recent Training</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Table of your most recent training sessions.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="recent_training" 
+                                                    data-title="Recent Training Sessions" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-trophy text-warning fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Personal Records</h5>
+                                            </div>
+                                            <p class="card-text text-muted">List of your most recent personal records in training.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="personal_records" 
+                                                    data-title="Personal Records" 
+                                                    data-size="medium">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Advanced Widgets -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Personal Records</h5>
-                                    <p class="card-text">Shows your most recent personal records in training.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="personal_records" 
-                                            data-title="Personal Records" 
-                                            data-size="medium">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                        <div class="tab-pane fade" id="advanced-widgets" role="tabpanel" aria-labelledby="advanced-tab">
+                            <div class="row row-cols-1 row-cols-md-2 g-4">
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-calendar-alt text-primary fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Activity Heatmap</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Calendar heatmap showing activity intensity over time.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="activity_heatmap" 
+                                                    data-title="Activity Heatmap" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Activity Heatmap</h5>
-                                    <p class="card-text">Calendar heatmap showing your activity intensity over time.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="activity_heatmap" 
-                                            data-title="Activity Heatmap" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Recent Insights</h5>
-                                    <p class="card-text">Shows insights from correlation analysis.</p>
-                                    <button class="btn btn-sm btn-outline-primary add-widget-btn" 
-                                            data-type="recent_insights" 
-                                            data-title="Recent Insights" 
-                                            data-size="large">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
+                                
+                                <div class="col">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                                                    <i class="fas fa-lightbulb text-success fa-fw fa-lg"></i>
+                                                </div>
+                                                <h5 class="card-title mb-0">Recent Insights</h5>
+                                            </div>
+                                            <p class="card-text text-muted">Automated insights from correlation analysis of your data.</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0 pt-0">
+                                            <button class="btn btn-sm btn-outline-primary w-100 add-widget-btn" 
+                                                    data-type="recent_insights" 
+                                                    data-title="Recent Insights" 
+                                                    data-size="large">
+                                                <i class="fas fa-plus me-1"></i> Add to Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -323,31 +474,35 @@ $pageTitle = 'Dashboard Settings';
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Dashboard Preview -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="mb-0">Current Dashboard Layout</h3>
-                <button class="btn btn-outline-secondary" id="resetLayoutBtn">
-                    <i class="fas fa-undo"></i> Reset to Default
-                </button>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Drag and drop widgets to reorder them. Click the remove button to remove a widget from your dashboard.</p>
-                
-                <?php if (empty($widgets)): ?>
-                    <div class="alert alert-info">
-                        You don't have any widgets configured yet. Add some from the options above.
+        
+        <!-- Preferences Tab -->
+        <div class="tab-pane fade" id="preferences" role="tabpanel" aria-labelledby="preferences-tab">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h3 class="h5 mb-0">Display Preferences</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="preferencesForm">
+                                <div class="mb-4">
+                                    <label for="defaultView" class="form-label">Default Time Range</label>
+                                    <select class="form-select" id="defaultView" name="default_view">
+                                        <option value="daily" <?= $preferences['default_view'] === 'daily' ? 'selected' : '' ?>>Daily (last 24 hours)</option>
+                                        <option value="weekly" <?= $preferences['default_view'] === 'weekly' ? 'selected' : '' ?>>Weekly (last 7 days)</option>
+                                        <option value="monthly" <?= $preferences['default_view'] === 'monthly' ? 'selected' : '' ?>>Monthly (last 30 days)</option>
+                                    </select>
+                                    <div class="form-text text-muted">Choose the default time period for your dashboard widgets.</div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">Save Preferences</button>
+                            </form>
+                            
+                            <!-- Alert for preferences form -->
+                            <div id="preferencesAlert" class="alert mt-3" style="display: none;"></div>
+                        </div>
                     </div>
-                <?php else: ?>
-                    <div class="dashboard-preview" id="widgetContainer">
-                        <!-- This will be populated by JavaScript with the draggable widgets -->
-                    </div>
-                <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>

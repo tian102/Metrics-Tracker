@@ -1,6 +1,6 @@
 /**
  * Dashboard Settings JavaScript
- * Handles functionality for dashboard customization
+ * Handles functionality for dashboard customization with fixed drag and drop
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -10,14 +10,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up sortable container for drag-and-drop
     const widgetContainer = document.getElementById('widgetContainer');
     if (widgetContainer) {
-        const sortable = new Sortable(widgetContainer, {
-            animation: 150,
-            ghostClass: 'widget-ghost',
-            handle: '.widget-handle',
-            onEnd: function(evt) {
-                updateWidgetPositions();
+        // Wait for widgets to be rendered
+        setTimeout(() => {
+            // Find the actual row container that contains the widgets
+            const widgetRow = document.getElementById('widgetRow');
+            if (widgetRow) {
+                const sortable = new Sortable(widgetRow, {
+                    animation: 150,
+                    ghostClass: 'widget-ghost',
+                    handle: '.widget-handle',
+                    draggable: '.dashboard-widget',
+                    forceFallback: true,  // Force the fallback solution to prevent text selection
+                    fallbackClass: 'sortable-fallback',
+                    filter: '.widget-actions',
+                    preventOnFilter: true,
+                    onStart: function(evt) {
+                        document.body.classList.add('widget-dragging');
+                        evt.item.classList.add('is-dragging');
+                    },
+                    onEnd: function(evt) {
+                        document.body.classList.remove('widget-dragging');
+                        evt.item.classList.remove('is-dragging');
+                        updateWidgetPositions();
+                    }
+                });
+                console.log('Sortable initialized on widget row');
+            } else {
+                console.error('Widget row not found');
             }
-        });
+        }, 500); // Short delay to ensure DOM is ready
     }
     
     // Event listener for the preferences form
@@ -50,6 +71,43 @@ document.addEventListener('DOMContentLoaded', function() {
             const widgetId = e.target.closest('.dashboard-widget').dataset.id;
             removeWidget(widgetId);
         }
+    });
+
+    // Add tab functionality if not using Bootstrap's native tab handling
+    document.querySelectorAll('#settingsTabs .nav-link, #widget-categories .nav-link').forEach(tabLink => {
+        tabLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Get the target tab content
+            const targetId = this.getAttribute('data-bs-target');
+            if (!targetId) return;
+            
+            const targetContent = document.querySelector(targetId);
+            if (!targetContent) return;
+            
+            // Deactivate all tabs in this group
+            const tabList = this.closest('.nav');
+            tabList.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                link.setAttribute('aria-selected', 'false');
+            });
+            
+            // Hide all tab content in this group
+            const tabContents = document.querySelectorAll('.tab-pane');
+            tabContents.forEach(content => {
+                if (content.getAttribute('aria-labelledby') && 
+                    document.querySelector('#' + content.getAttribute('aria-labelledby'))?.closest('.nav') === tabList) {
+                    content.classList.remove('show', 'active');
+                }
+            });
+            
+            // Activate the selected tab
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+            
+            // Show the target content
+            targetContent.classList.add('show', 'active');
+        });
     });
 });
 
@@ -100,11 +158,17 @@ function renderWidgets(widgets) {
         const sizeClass = widget.widget_size === 'large' ? 'col-md-12' : 'col-md-6 col-xl-3';
         
         html += `
-        <div class="dashboard-widget ${sizeClass} mb-4" data-id="${widget.id}" data-position="${widget.widget_position}" data-type="${widget.widget_type}">
+        <div class="dashboard-widget ${sizeClass} mb-4" data-id="${widget.id}" data-position="${widget.widget_position}" data-type="${widget.widget_type}" data-size="${widget.widget_size}">
             <div class="card h-100 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center widget-handle" style="cursor: grab;">
-                    <h5 class="mb-0">${widget.widget_title}</h5>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-grip-vertical me-2 text-muted"></i>
+                        <h5 class="mb-0">${widget.widget_title}</h5>
+                    </div>
                     <div class="widget-actions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary resize-widget-btn me-2" title="Toggle widget size">
+                            <i class="fas ${widget.widget_size === 'large' ? 'fa-compress-alt' : 'fa-expand-alt'}"></i>
+                        </button>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-widget-btn">
                             <i class="fas fa-times"></i>
                         </button>
@@ -112,8 +176,11 @@ function renderWidgets(widgets) {
                 </div>
                 <div class="card-body widget-preview">
                     <div class="text-center py-5">
-                        <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                        <i class="fas ${getWidgetIcon(widget.widget_type)} fa-3x text-muted mb-3"></i>
                         <p class="text-muted">${getWidgetDescription(widget.widget_type)}</p>
+                        <span class="badge ${widget.widget_size === 'large' ? 'bg-info' : 'bg-secondary'} mt-2 widget-size-badge">
+                            ${widget.widget_size === 'large' ? 'Large (Full Width)' : 'Medium (Half Width)'}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -123,6 +190,42 @@ function renderWidgets(widgets) {
     
     html += '</div>';
     container.innerHTML = html;
+    
+    // Add event listeners for the resize buttons after rendering
+    document.querySelectorAll('.resize-widget-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const widgetElement = this.closest('.dashboard-widget');
+            const widgetId = widgetElement.dataset.id;
+            const currentSize = widgetElement.dataset.size;
+            const newSize = currentSize === 'large' ? 'medium' : 'large';
+            resizeWidget(widgetId, newSize);
+        });
+    });
+}
+
+/**
+ * Get appropriate icon for a widget type
+ */
+function getWidgetIcon(widgetType) {
+    const icons = {
+        'sleep_stats': 'fa-bed',
+        'energy_stats': 'fa-bolt',
+        'nutrition_stats': 'fa-apple-alt',
+        'training_stats': 'fa-dumbbell',
+        'weight_chart': 'fa-weight',
+        'sleep_chart': 'fa-bed',
+        'energy_chart': 'fa-chart-line',
+        'nutrition_chart': 'fa-utensils',
+        'recent_daily': 'fa-calendar-day',
+        'recent_training': 'fa-list',
+        'personal_records': 'fa-trophy',
+        'activity_heatmap': 'fa-calendar-alt',
+        'recent_insights': 'fa-lightbulb'
+    };
+    
+    return icons[widgetType] || 'fa-chart-bar';
 }
 
 /**
@@ -208,6 +311,11 @@ function addWidget(widgetType, widgetTitle, widgetSize) {
         if (result.success) {
             showAlert('widgetAlert', 'success', 'Widget added successfully');
             loadCurrentWidgets(); // Refresh the widget list
+            
+            // Switch to the Layout tab to show the newly added widget
+            if (document.querySelector('#layout-tab')) {
+                document.querySelector('#layout-tab').click();
+            }
         } else {
             showAlert('widgetAlert', 'danger', 'Failed to add widget: ' + result.message);
         }
@@ -259,6 +367,36 @@ function removeWidget(widgetId) {
     .catch(error => {
         console.error('Error:', error);
         showAlert('widgetAlert', 'danger', 'Error removing widget. Please try again.');
+    });
+}
+
+/**
+ * Resize a widget (toggle between medium and large)
+ */
+function resizeWidget(widgetId, newSize) {
+    fetch('api/dashboard.php?action=update_widget', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            id: widgetId,
+            widget_size: newSize
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Success - reload widgets to reflect new size
+            showAlert('widgetAlert', 'success', `Widget ${newSize === 'large' ? 'expanded' : 'reduced'} successfully`);
+            loadCurrentWidgets();
+        } else {
+            showAlert('widgetAlert', 'danger', 'Failed to resize widget: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('widgetAlert', 'danger', 'Error resizing widget. Please try again.');
     });
 }
 
@@ -329,3 +467,66 @@ function showAlert(elementId, type, message) {
         alertElement.style.display = 'none';
     }, 3000);
 }
+
+// Add CSS for drag and drop visual cues
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+    /* Drag and drop styling */
+    .widget-handle {
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+    }
+    
+    .widget-handle:active {
+        cursor: grabbing;
+    }
+    
+    .widget-ghost {
+        opacity: 0.5;
+        background-color: #f8f9fa;
+        border: 2px dashed #0d6efd !important;
+    }
+    
+    .is-dragging {
+        z-index: 9999;
+    }
+    
+    .is-dragging .card {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* Ensure widget content is visible during drag */
+    .sortable-drag .card-body {
+        opacity: 0.7;
+    }
+    
+    /* Fallback styling for dragging */
+    .sortable-fallback {
+        opacity: 0.8;
+        transform: rotate(2deg);
+    }
+    
+    /* Visual handle indicator */
+    .widget-handle i.fa-grip-vertical {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+    }
+    
+    .dashboard-widget:hover .widget-handle i.fa-grip-vertical {
+        opacity: 1;
+    }
+    
+    /* Prevent text selection during drag */
+    .widget-dragging {
+        cursor: grabbing !important;
+    }
+    
+    .widget-dragging * {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+    }
+</style>
+`);

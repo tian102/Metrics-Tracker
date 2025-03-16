@@ -99,13 +99,21 @@ $prCount = $db->single()['count'];
 </div>
 
 <!-- Dashboard Widgets -->
-<div id="dashboardWidgets">
-    <div class="dashboard-loading text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+<div id="dashboardWidgets" class="row g-4">
+    <?php foreach ($widgets as $widget): ?>
+    <div class="<?= $widget['widget_size'] === 'large' ? 'col-12' : 'col-md-6' ?>">
+        <div class="metric-card">
+            <div class="card-header">
+                <h5 class="card-title"><?= htmlspecialchars($widget['widget_title']) ?></h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <!-- Widget content -->
+                </div>
+            </div>
         </div>
-        <p class="mt-2">Loading your dashboard...</p>
     </div>
+    <?php endforeach; ?>
 </div>
 
 <!-- PR Modal -->

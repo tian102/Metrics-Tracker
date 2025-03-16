@@ -75,6 +75,15 @@ switch ($action) {
         // Get data for a specific widget
         getWidgetData($userId);
         break;
+    
+    case 'update_widget':
+        // Update widget properties
+        if ($method !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+            break;
+        }
+        updateWidget($userId);
+        break;
         
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action']);
@@ -244,6 +253,84 @@ function updateWidgetPositions($userId) {
         // Rollback transaction on error
         $db->rollBack();
         echo json_encode(['success' => false, 'message' => 'Failed to update widget positions: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ * Update widget properties
+ * @param int $userId User ID
+ */
+function updateWidget($userId) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    if (!isset($data['id'])) {
+        echo json_encode(['success' => false, 'message' => 'Widget ID is required']);
+        return;
+    }
+    
+    $widgetId = (int)$data['id'];
+    
+    $db = new Database();
+    
+    // Ensure the widget belongs to the user
+    $db->query("SELECT id FROM dashboard_widgets WHERE id = :id AND user_id = :user_id");
+    $db->bind(':id', $widgetId);
+    $db->bind(':user_id', $userId);
+    
+    $widget = $db->single();
+    
+    if (!$widget) {
+        echo json_encode(['success' => false, 'message' => 'Widget not found or access denied']);
+        return;
+    }
+    
+    // Build update query based on provided fields
+    $updates = [];
+    $params = [':id' => $widgetId];
+    
+    // Handle widget_size
+    if (isset($data['widget_size'])) {
+        if (in_array($data['widget_size'], ['small', 'medium', 'large'])) {
+            $updates[] = "widget_size = :widget_size";
+            $params[':widget_size'] = $data['widget_size'];
+        }
+    }
+    
+    // Handle widget_title
+    if (isset($data['widget_title'])) {
+        $updates[] = "widget_title = :widget_title";
+        $params[':widget_title'] = $data['widget_title'];
+    }
+    
+    // Handle widget_position
+    if (isset($data['widget_position']) && is_numeric($data['widget_position'])) {
+        $updates[] = "widget_position = :widget_position";
+        $params[':widget_position'] = (int)$data['widget_position'];
+    }
+    
+    // Handle is_visible
+    if (isset($data['is_visible']) && is_bool($data['is_visible'])) {
+        $updates[] = "is_visible = :is_visible";
+        $params[':is_visible'] = $data['is_visible'] ? 1 : 0;
+    }
+    
+    // No valid updates provided
+    if (empty($updates)) {
+        echo json_encode(['success' => false, 'message' => 'No valid widget properties provided to update']);
+        return;
+    }
+    
+    // Execute the update
+    $db->query("UPDATE dashboard_widgets SET " . implode(', ', $updates) . " WHERE id = :id");
+    
+    foreach ($params as $param => $value) {
+        $db->bind($param, $value);
+    }
+    
+    if ($db->execute()) {
+        echo json_encode(['success' => true, 'message' => 'Widget updated successfully']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to update widget']);
     }
 }
 
