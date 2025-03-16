@@ -5,13 +5,30 @@
     --theme-card-bg: #ffffff;
     --theme-border: rgba(0,0,0,.125);
     --theme-hover-bg: #f8f9fa;
+    --theme-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Theme Transitions */
 body {
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color var(--theme-transition),
+                color var(--theme-transition);
 }
 
-.card, .metric-card {
-    transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
+.card, .metric-card, .btn, .form-control, .dropdown-menu {
+    transition: all var(--theme-transition);
+}
+
+/* Hover Effects */
+.card:hover, .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Focus States */
+.form-control:focus, .btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), 0.25);
 }

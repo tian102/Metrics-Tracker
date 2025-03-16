@@ -312,6 +312,23 @@ require_once 'includes/header.php';
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <div class="col-md-3 col-sm-6 mb-4">
+                                    <div class="card theme-card <?php echo ($user['theme'] == 'tech') ? 'border-primary' : ''; ?>" onclick="document.getElementById('theme_tech').checked = true;">
+                                        <div class="card-body text-center p-4" style="height: 120px; background-color: #1a1b1e; color: #61dafb;">
+                                            <h5>Tech</h5>
+                                            <p class="mb-0"><small>Modern & sleek</small></p>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="theme" id="theme_tech" value="tech" <?php echo ($user['theme'] == 'tech') ? 'checked' : ''; ?>>
+                                                <label class="form-check-label" for="theme_tech">
+                                                    Tech
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="row mt-3">

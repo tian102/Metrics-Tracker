@@ -1,0 +1,94 @@
+/* Modern Tech Theme */
+:root {
+    --primary-color: #61dafb;
+    --secondary-color: #646cff;
+    --success-color: #00b894;
+    --danger-color: #ff5555;
+    --warning-color: #ffd93d;
+    --info-color: #6c5ce7;
+    --bg-color: #1a1b1e;
+    --text-color: #e2e8f0;
+    --text-muted: #94a3b8;
+    --card-bg: #222327;
+    --card-border: #2a2b2f;
+    --card-header-bg: #26272b;
+    --nav-bg: #1a1b1e;
+    --nav-text: #e2e8f0;
+    --nav-link-hover: #61dafb;
+    --input-bg: #2a2b2f;
+    --input-border: #373a3f;
+    --chart-grid: #2a2b2f;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.card, .metric-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+}
+
+.card-header {
+    background-color: var(--card-header-bg) !important;
+}
+
+.table {
+    color: var(--text-color);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(97, 218, 251, 0.1);
+}
+
+.dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+}
+
+.dropdown-item {
+    color: var(--text-color);
+}
+
+.dropdown-item:hover {
+    background-color: rgba(97, 218, 251, 0.1);
+    color: var(--primary-color);
+}
+
+.form-control, .form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-color);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--primary-color);
+    color: var(--text-color);
+    box-shadow: 0 0 0 0.25rem rgba(97, 218, 251, 0.25);
+}
+
+/* Chart customization */
+.chart-container canvas {
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--card-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}
