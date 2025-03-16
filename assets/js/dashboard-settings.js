@@ -638,10 +638,10 @@ document.head.insertAdjacentHTML('beforeend', `
 // Update getSizeClass function
 function getSizeClass(size) {
     const classes = {
-        'medium': 'col-xl-3 col-lg-6',  // Medium (Half Width) - 4 per row on xl, 2 per row on lg
-        'large': 'col-12'              // Large (Full Width)
+        'medium': 'col-md-6 col-xl-3',  // 4 per row on xl, 2 per row on md
+        'large': 'col-12'               // Full width
     };
-    return classes[size] || 'col-xl-3 col-lg-6';
+    return classes[size] || 'col-md-6 col-xl-3';
 }
 
 // Update the initializeSortable function
