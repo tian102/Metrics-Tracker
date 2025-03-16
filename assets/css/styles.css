@@ -20,12 +20,22 @@
     --bs-info: #3498db;
 }
 
+/* Core Responsive Layout */
+:root {
+    --header-height: 60px;
+    --sidebar-width: 250px;
+    --sidebar-collapsed-width: 70px;
+}
+
 /* Base Elements */
 body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     background-color: #f8f9fa;
+    font-size: 16px;
+    line-height: 1.5;
+    overflow-x: hidden;
 }
 
 main {
@@ -201,6 +211,10 @@ input[type="range"] {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
     margin-bottom: 2rem;
+    margin-bottom: 1rem;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.2s ease-in-out;
 }
 
 .card-header {
@@ -210,6 +224,34 @@ input[type="range"] {
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid #eee;
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+}
+
+.card-header .d-flex {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .card-header .d-flex {
+        flex-direction: column;
+    }
+
+    .card-header .btn-group {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .card-header .dropdown {
+        width: 100%;
+    }
+
+    .card-header .dropdown-toggle {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .card-content {
@@ -219,6 +261,7 @@ input[type="range"] {
 /* Forms */
 .form-group {
     margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 .form-row {
@@ -275,6 +318,17 @@ select:focus {
     font-weight: bold;
 }
 
+.form-control, .form-select {
+    height: 42px;
+    font-size: 1rem;
+}
+
+@media (max-width: 576px) {
+    .form-control, .form-select {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
 /* Buttons */
 .btn {
     display: inline-block;
@@ -323,6 +377,20 @@ select:focus {
 .btn-group {
     display: flex;
     gap: 10px;
+    flex-wrap: nowrap;
+}
+
+@media (max-width: 576px) {
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-group > .btn {
+        width: 100%;
+        border-radius: 0.25rem !important;
+        margin-bottom: 0.25rem;
+    }
 }
 
 /* Tables */
@@ -842,6 +910,7 @@ input[list] {
 
 .metric-card .card-body {
     padding: 1rem;
+    height: auto;
 }
 
 /* Chart container styles */
@@ -1335,4 +1404,211 @@ input[list] {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+}
+
+/* Mobile-First Base Styles */
+body {
+    font-size: 16px;
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* Responsive Container Adjustments */
+.container-fluid {
+    padding-right: var(--bs-gutter-x, 0.75rem);
+    padding-left: var(--bs-gutter-x, 0.75rem);
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-right: var(--bs-gutter-x, 0.5rem);
+        padding-left: var(--bs-gutter-x, 0.5rem);
+    }
+}
+
+/* Card Improvements */
+.card {
+    margin-bottom: 1rem;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.2s ease-in-out;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+}
+
+/* Mobile-Friendly Headers */
+.card-header .d-flex {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .card-header .d-flex {
+        flex-direction: column;
+    }
+
+    .card-header .btn-group {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .card-header .dropdown {
+        width: 100%;
+    }
+
+    .card-header .dropdown-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Improved Button Groups */
+.btn-group {
+    flex-wrap: nowrap;
+}
+
+@media (max-width: 576px) {
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-group > .btn {
+        width: 100%;
+        border-radius: 0.25rem !important;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* Mobile-Friendly Forms */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-control, .form-select {
+    height: 42px;
+    font-size: 1rem;
+}
+
+@media (max-width: 576px) {
+    .form-control, .form-select {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+/* Responsive Tables */
+.table-responsive {
+    margin-bottom: 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-Friendly Modals */
+@media (max-width: 576px) {
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+
+    .modal-content {
+        border-radius: 0.5rem;
+    }
+
+    .modal-header {
+        padding: 0.75rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    .modal-footer {
+        padding: 0.75rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .modal-footer > * {
+        width: 100%;
+        margin: 0 !important;
+    }
+}
+
+/* Responsive Charts */
+.chart-container {
+    position: relative;
+    height: auto;
+    min-height: 300px;
+}
+
+@media (max-width: 768px) {
+    .chart-container {
+        min-height: 250px;
+    }
+}
+
+/* Dashboard Widgets */
+.dashboard-widget {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 992px) {
+    .col-md-6 {
+        width: 100%;
+    }
+}
+
+/* Navigation Improvements */
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+
+    .navbar-nav .dropdown-menu {
+        position: static;
+        float: none;
+        width: auto;
+        margin-top: 0;
+        background-color: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .nav-link {
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* Mobile Touch Improvements */
+@media (max-width: 768px) {
+    .btn, 
+    .nav-link,
+    .dropdown-item {
+        padding: 0.75rem 1rem;
+        min-height: 44px; /* iOS minimum touch target size */
+        display: flex;
+        align-items: center;
+    }
+
+    .form-control,
+    .form-select {
+        min-height: 44px;
+    }
+}
+
+/* Better Spacing for Mobile */
+.g-4 {
+    --bs-gutter-y: 1rem;
+}
+
+@media (max-width: 768px) {
+    .g-4 {
+        --bs-gutter-y: 0.5rem;
+    }
+
+    .mb-4 {
+        margin-bottom: 1rem !important;
+    }
 }
