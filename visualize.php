@@ -120,13 +120,13 @@ foreach ($trainingSessions as $session) {
                 <!-- Tab content -->
                 <div class="tab-content" id="visualTabsContent">
                     <!-- Daily Metrics Tab -->
-                    <div class="tab-pane fade <?php echo ($activeTab == 'daily-metrics-tab') ? 'show active' : ''; ?>" id="daily-metrics" role="tabpanel" aria-labelledby="daily-metrics-tab">
-                        <div class="row">
+                    <div class="tab-pane fade <?php echo ($activeTab == 'daily-metrics-tab') ? 'show active' : ''; ?>" id="daily-metrics" role="tabpanel">
+                        <div class="row g-4">
                             <!-- Weight Progress Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
-                                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                                        <h5 class="card-title mb-2 mb-md-0">Weight Progress</h5>
+                                <div class="metric-card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Weight Progress</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="chart-container">
@@ -138,9 +138,9 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Sleep Duration Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
-                                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                                        <h5 class="card-title mb-2 mb-md-0">Sleep Duration</h5>
+                                <div class="metric-card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Sleep Duration</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="chart-container">
@@ -152,7 +152,7 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Personal Metrics Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Personal Metrics</h5>
                                     </div>
@@ -167,13 +167,13 @@ foreach ($trainingSessions as $session) {
                     </div>
                     
                     <!-- Nutrition Tab -->
-                    <div class="tab-pane fade <?php echo ($activeTab == 'nutrition-tab') ? 'show active' : ''; ?>" id="nutrition" role="tabpanel" aria-labelledby="nutrition-tab">
-                        <div class="row">
+                    <div class="tab-pane fade <?php echo ($activeTab == 'nutrition-tab') ? 'show active' : ''; ?>" id="nutrition" role="tabpanel">
+                        <div class="row g-4">
                             <!-- Calories Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
-                                        <h5 class="card-title">Calorie Intake</h5>
+                                        <h5 class="card-title">Calories</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="chart-container">
@@ -185,7 +185,7 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Macronutrients Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Macronutrients</h5>
                                     </div>
@@ -199,7 +199,7 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Water Intake Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Water Intake</h5>
                                     </div>
@@ -214,11 +214,12 @@ foreach ($trainingSessions as $session) {
                     </div>
                     
                     <!-- Training Tab -->
-                    <div class="tab-pane fade <?php echo ($activeTab == 'training-tab') ? 'show active' : ''; ?>" id="training" role="tabpanel" aria-labelledby="training-tab">
-                        <div class="row">
-                            <!-- Training Volume by Muscle Group -->
+                    <div class="tab-pane fade <?php echo ($activeTab == 'training-tab') ? 'show active' : ''; ?>" id="training" role="tabpanel">
+                        <!-- First row -->
+                        <div class="row g-4">
+                            <!-- Training Volume Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Training Volume by Muscle Group</h5>
                                     </div>
@@ -232,41 +233,36 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Exercise Progress Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
-                                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                                        <h5 class="card-title mb-2 mb-md-0">Exercise Progress</h5>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <select id="exerciseSelector" class="form-select" style="width: auto;">
-                                                <option value="">Select Exercise</option>
-                                                <?php
-                                                // Get unique exercises
-                                                $exercises = [];
-                                                foreach ($workoutDetails as $workout) {
-                                                    if (!in_array($workout['exercise_name'], $exercises)) {
-                                                        $exercises[] = $workout['exercise_name'];
-                                                        echo '<option value="' . htmlspecialchars($workout['exercise_name']) . '">' . 
-                                                             htmlspecialchars($workout['exercise_name']) . '</option>';
-                                                    }
+                                <div class="metric-card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Exercise Progress</h5>
+                                        <select id="exerciseSelector" class="form-select mt-2">
+                                            <option value="">Select Exercise</option>
+                                            <?php
+                                            $exercises = [];
+                                            foreach ($workoutDetails as $workout) {
+                                                if (!in_array($workout['exercise_name'], $exercises)) {
+                                                    $exercises[] = $workout['exercise_name'];
+                                                    echo '<option value="' . htmlspecialchars($workout['exercise_name']) . '">' . 
+                                                         htmlspecialchars($workout['exercise_name']) . '</option>';
                                                 }
-                                                ?>
-                                            </select>
-                                        </div>
+                                            }
+                                            ?>
+                                        </select>
                                     </div>
                                     <div class="card-body">
-                                        <!-- Add a wrapper div for the chart -->
                                         <div id="exerciseProgressChartWrapper" class="chart-container">
-                                            <!-- Clear the chart container before recreating -->
-                                            <div style="position: relative; height: 300px;">
-                                                <canvas id="exerciseProgressChart"></canvas>
-                                            </div>
+                                            <canvas id="exerciseProgressChart"></canvas>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
+                        </div>
+                        <!-- Second row -->
+                        <div class="row g-4 mt-4">
                             <!-- Stimulus & Fatigue Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Stimulus & Fatigue</h5>
                                     </div>
@@ -280,7 +276,7 @@ foreach ($trainingSessions as $session) {
                             
                             <!-- Training Duration Chart -->
                             <div class="col-md-6">
-                                <div class="card metric-card">
+                                <div class="metric-card">
                                     <div class="card-header">
                                         <h5 class="card-title">Training Duration</h5>
                                     </div>
