@@ -1089,3 +1089,79 @@ input[list] {
     transform: none;
     box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
 }
+
+/* Dashboard header styling */
+.card-header .btn-group {
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.card-header .btn-group .btn {
+    border-radius: 0;
+    margin: 0;
+}
+
+.card-header .btn-group .btn:first-child {
+    border-top-left-radius: 0.375rem;
+    border-bottom-left-radius: 0.375rem;
+}
+
+.card-header .btn-group .btn:last-child {
+    border-top-right-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+/* Improved button spacing */
+.card-header .gap-3 {
+    gap: 1rem !important;
+}
+
+.card-header .gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Ensure proper alignment on mobile */
+@media (max-width: 768px) {
+    .card-header .d-flex.flex-column.flex-md-row {
+        gap: 1rem;
+    }
+    
+    .card-header .btn-group {
+        width: 100%;
+    }
+    
+    .card-header .btn-group .btn {
+        flex: 1;
+    }
+}
+
+/* Dashboard header styling */
+.card-header .d-flex {
+    flex-wrap: nowrap;
+}
+
+@media (max-width: 768px) {
+    .card-header .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 1rem;
+    }
+
+    .card-header .btn-group {
+        width: 100%;
+    }
+
+    .card-header .btn-group .btn {
+        flex: 1;
+    }
+
+    .card-header h2 {
+        text-align: center;
+    }
+}
+
+/* Button group spacing */
+.btn-group + .btn-group,
+.btn-group + .btn {
+    margin-left: 0.5rem;
+}
