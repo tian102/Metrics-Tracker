@@ -288,9 +288,9 @@ function updateWidget($userId) {
     $updates = [];
     $params = [':id' => $widgetId];
     
-    // Handle widget_size
+    // Handle widget_size - now including 'medium-full' option
     if (isset($data['widget_size'])) {
-        if (in_array($data['widget_size'], ['small', 'medium', 'large'])) {
+        if (in_array($data['widget_size'], ['small', 'medium', 'medium-full', 'large'])) {
             $updates[] = "widget_size = :widget_size";
             $params[':widget_size'] = $data['widget_size'];
         }

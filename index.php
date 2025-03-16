@@ -69,29 +69,48 @@ $prCount = $db->single()['count'];
 <div class="row mb-4">
     <div class="col-12">
         <div class="card shadow-sm">
-            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                <h2 class="mb-2 mb-md-0">Dashboard</h2>
-                <div class="d-flex flex-wrap gap-2">
-                    <!-- View Selector -->
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'daily' ? 'active' : '' ?>" data-view="daily">Daily</button>
-                        <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'weekly' ? 'active' : '' ?>" data-view="weekly">Weekly</button>
-                        <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'monthly' ? 'active' : '' ?>" data-view="monthly">Monthly</button>
+            <div class="card-header bg-white py-3 px-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap w-100">
+                    <!-- Left side - Dashboard Title -->
+                    <div class="me-3">
+                        <h2 class="m-0">Dashboard</h2>
                     </div>
                     
-                    <!-- Action Buttons -->
-                    <a href="daily.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add Daily Metrics</a>
-                    <a href="training.php" class="btn btn-success"><i class="fas fa-plus"></i> Add Training Session</a>
-                    <?php if ($prCount > 0): ?>
-                        <a href="#" id="viewPRsBtn" class="btn btn-warning position-relative">
-                            <i class="fas fa-trophy"></i> New PRs
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                <?= $prCount ?>
-                                <span class="visually-hidden">New Personal Records</span>
-                            </span>
-                        </a>
-                    <?php endif; ?>
-                    <a href="dashboard_settings.php" class="btn btn-outline-secondary"><i class="fas fa-cog"></i> Customize</a>
+                    <!-- Right side - Controls -->
+                    <div class="d-flex align-items-center gap-3">
+                        <!-- View Selector -->
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'daily' ? 'active' : '' ?>" data-view="daily">
+                                <i class="fas fa-calendar-day me-1"></i>Daily
+                            </button>
+                            <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'weekly' ? 'active' : '' ?>" data-view="weekly">
+                                <i class="fas fa-calendar-week me-1"></i>Weekly
+                            </button>
+                            <button type="button" class="btn btn-outline-primary view-selector <?= $preferences['default_view'] === 'monthly' ? 'active' : '' ?>" data-view="monthly">
+                                <i class="fas fa-calendar-alt me-1"></i>Monthly
+                            </button>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-primary dropdown-toggle" id="addNewDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-plus me-1"></i>Add New
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="addNewDropdown">
+                                <li><a class="dropdown-item" href="daily.php"><i class="fas fa-calendar-day me-2"></i>Daily Metrics</a></li>
+                                <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell me-2"></i>Training Session</a></li>
+                            </ul>
+                        </div>
+
+                        <?php if ($prCount > 0): ?>
+                            <a href="#" id="viewPRsBtn" class="btn btn-warning position-relative">
+                                <i class="fas fa-trophy me-1"></i>New PRs
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    <?= $prCount ?>
+                                </span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>

@@ -36,12 +36,12 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
                     </button>
-                    <div class="collapse navbar-collapse" id="navbarNav">
+                    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                         <?php if (isLoggedIn()): ?>
                             <ul class="navbar-nav">
                                 <li class="nav-item">
                                     <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : ''; ?>" href="index.php">
-                                        <i class="fas fa-home"></i> Home
+                                        <i class="fas fa-home"></i> Dashboard
                                     </a>
                                 </li>
                                 <li class="nav-item dropdown">
@@ -58,8 +58,10 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                         <i class="fas fa-chart-bar"></i> Analytics
                                     </a>
                                 </li>
-                            </ul>
-                            <ul class="navbar-nav ms-auto">
+                                <!-- Replace the text separator with a border -->
+                                <li class="nav-item d-none d-lg-block">
+                                    <div class="vr bg-light opacity-50 mx-2 my-2"></div>
+                                </li>
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-user"></i> 
@@ -67,13 +69,14 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                         <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user-cog"></i> My Profile</a></li>
+                                        <li><a class="dropdown-item" href="dashboard_settings.php"><i class="fas fa-columns"></i> Customize Dashboard</a></li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item" href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                                     </ul>
                                 </li>
                             </ul>
                         <?php else: ?>
-                            <ul class="navbar-nav ms-auto">
+                            <ul class="navbar-nav">
                                 <li class="nav-item">
                                     <a class="nav-link" href="login.php"><i class="fas fa-sign-in-alt"></i> Login</a>
                                 </li>

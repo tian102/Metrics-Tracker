@@ -92,11 +92,6 @@ function loadWidgets(widgets, view) {
                 <div class="card shadow-sm h-100" id="widget-${widget.id}">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">${widget.widget_title}</h5>
-                        <div class="widget-controls">
-                            <button class="btn btn-sm btn-outline-secondary widget-refresh-btn" data-widget-id="${widget.id}" data-widget-type="${widget.widget_type}">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
                     </div>
                     <div class="card-body widget-content" data-widget-type="${widget.widget_type}">
                         <div class="d-flex justify-content-center align-items-center h-100">
@@ -119,15 +114,6 @@ function loadWidgets(widgets, view) {
     // Load content for each widget
     widgets.forEach(widget => {
         loadWidgetContent(widget.id, widget.widget_type, startDateString, endDateString);
-    });
-    
-    // Add event listeners for widget refresh buttons
-    document.querySelectorAll('.widget-refresh-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const widgetId = this.getAttribute('data-widget-id');
-            const widgetType = this.getAttribute('data-widget-type');
-            loadWidgetContent(widgetId, widgetType, startDateString, endDateString);
-        });
     });
 }
 
