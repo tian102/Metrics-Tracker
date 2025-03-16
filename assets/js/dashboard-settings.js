@@ -146,64 +146,48 @@ function renderWidgets(widgets) {
     
     widgets.forEach(widget => {
         html += `
-        <div class="dashboard-widget ${getSizeClass(widget.widget_size)}" data-id="${widget.id}" data-position="${widget.widget_position}">
-            <div class="card metric-card">
+        <div class="dashboard-widget ${getSizeClass(widget.widget_size)}" data-id="${widget.id}" data-position="${widget.widget_position}" data-size="${widget.widget_size}">
+            <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center widget-handle">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-grip-vertical me-2 text-muted"></i>
-                        <h5 class="mb-0">${widget.widget_title}</h5>
-                    </div>
+                    <h5 class="card-title mb-0">${widget.widget_title}</h5>
                     <div class="widget-actions">
-                        <button class="btn btn-sm btn-outline-danger remove-widget-btn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <div class="widget-content flex-grow-1 mb-3">
-                        <div class="text-center py-4">
-                            <i class="fas ${getWidgetIcon(widget.widget_type)} fa-2x text-muted mb-2"></i>
-                            <p class="text-muted mb-0">${getWidgetDescription(widget.widget_type)}</p>
+                        <div class="dropdown">
+                            <span class="badge ${getSizeBadgeClass(widget.widget_size)} dropdown-toggle cursor-pointer" data-bs-toggle="dropdown">
+                                ${getSizeLabel(widget.widget_size)}
+                            </span>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item size-option ${widget.widget_size === 'small' ? 'active' : ''}" href="#" data-widget-id="${widget.id}" data-size="small">Small</a></li>
+                                <li><a class="dropdown-item size-option ${widget.widget_size === 'medium' ? 'active' : ''}" href="#" data-widget-id="${widget.id}" data-size="medium">Medium</a></li>
+                                <li><a class="dropdown-item size-option ${widget.widget_size === 'large' ? 'active' : ''}" href="#" data-widget-id="${widget.id}" data-size="large">Large</a></li>
+                            </ul>
                         </div>
                     </div>
-                    <div class="dropdown text-center">
-                        <span class="badge bg-secondary dropdown-toggle cursor-pointer" data-bs-toggle="dropdown">
-                            ${getSizeLabel(widget.widget_size)}
-                        </span>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="medium">Medium (Half Width)</a></li>
-                            <li><a class="dropdown-item size-option" href="#" data-widget-id="${widget.id}" data-size="large">Large (Full Width)</a></li>
-                        </ul>
+                </div>
+                <div class="card-body">
+                    <div class="widget-content text-center py-4">
+                        <i class="fas ${getWidgetIcon(widget.widget_type)} fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">${getWidgetDescription(widget.widget_type)}</p>
                     </div>
                 </div>
             </div>
         </div>`;
     });
-    
+
     html += '</div>';
     container.innerHTML = html;
 
     initializeSortable();
-
-    // Add event listeners for the size options
-    document.querySelectorAll('.size-option').forEach(option => {
-        option.addEventListener('click', function(e) {
-            e.preventDefault();
-            const widgetId = this.dataset.widgetId;
-            const newSize = this.dataset.size;
-            resizeWidget(widgetId, newSize);
-        });
-    });
+    initializeDropdowns();
 }
 
 // Helper function to get the appropriate badge class for widget size
 function getSizeBadgeClass(size) {
     switch(size) {
         case 'large':
-            return 'bg-info';
-        case 'medium-full':
             return 'bg-primary';
-        default: // medium (half width)
+        case 'medium':
+            return 'bg-info';
+        default: // small
             return 'bg-secondary';
     }
 }
@@ -211,16 +195,16 @@ function getSizeBadgeClass(size) {
 // Helper function to get the label for widget size
 function getSizeLabel(size) {
     const labels = {
-        'medium': 'Medium (Half Width)',
-        'large': 'Large (Full Width)'
+        'small': 'Small',
+        'medium': 'Medium',
+        'large': 'Large'
     };
-    return labels[size] || 'Medium (Half Width)';
+    return labels[size] || 'Small';
 }
 
 // Update the resizeWidget function to handle the new size option
 function resizeWidget(widgetId, newSize) {
-    // Validate size before sending request
-    const validSizes = ['medium', 'large'];
+    const validSizes = ['small', 'medium', 'large'];
     if (!validSizes.includes(newSize)) {
         console.error('Invalid size:', newSize);
         showAlert('widgetAlert', 'danger', 'Invalid widget size');
@@ -240,7 +224,29 @@ function resizeWidget(widgetId, newSize) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            loadCurrentWidgets();
+            const widget = document.querySelector(`.dashboard-widget[data-id="${widgetId}"]`);
+            if (widget) {
+                // Update widget class and data attribute
+                widget.className = `dashboard-widget ${getSizeClass(newSize)}`;
+                widget.dataset.size = newSize;
+                
+                // Update dropdown badge
+                const badge = widget.querySelector('.badge');
+                if (badge) {
+                    badge.className = `badge ${getSizeBadgeClass(newSize)} dropdown-toggle cursor-pointer`;
+                    badge.textContent = getSizeLabel(newSize);
+                }
+                
+                // Update active state in dropdown
+                const dropdownItems = widget.querySelectorAll('.size-option');
+                dropdownItems.forEach(item => {
+                    if (item.dataset.size === newSize) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+            }
             showAlert('widgetAlert', 'success', 'Widget size updated successfully');
         } else {
             showAlert('widgetAlert', 'danger', 'Failed to update widget size');
@@ -421,8 +427,7 @@ function removeWidget(widgetId) {
  * Resize a widget (toggle between medium and large)
  */
 function resizeWidget(widgetId, newSize) {
-    // Validate size before sending request
-    const validSizes = ['medium', 'large'];
+    const validSizes = ['small', 'medium', 'large'];
     if (!validSizes.includes(newSize)) {
         console.error('Invalid size:', newSize);
         showAlert('widgetAlert', 'danger', 'Invalid widget size');
@@ -442,7 +447,29 @@ function resizeWidget(widgetId, newSize) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            loadCurrentWidgets(); // Refresh all widgets
+            const widget = document.querySelector(`.dashboard-widget[data-id="${widgetId}"]`);
+            if (widget) {
+                // Update widget class and data attribute
+                widget.className = `dashboard-widget ${getSizeClass(newSize)}`;
+                widget.dataset.size = newSize;
+                
+                // Update dropdown badge
+                const badge = widget.querySelector('.badge');
+                if (badge) {
+                    badge.className = `badge ${getSizeBadgeClass(newSize)} dropdown-toggle cursor-pointer`;
+                    badge.textContent = getSizeLabel(newSize);
+                }
+                
+                // Update active state in dropdown
+                const dropdownItems = widget.querySelectorAll('.size-option');
+                dropdownItems.forEach(item => {
+                    if (item.dataset.size === newSize) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+            }
             showAlert('widgetAlert', 'success', 'Widget size updated successfully');
         } else {
             showAlert('widgetAlert', 'danger', 'Failed to update widget size');
@@ -638,10 +665,11 @@ document.head.insertAdjacentHTML('beforeend', `
 // Update getSizeClass function
 function getSizeClass(size) {
     const classes = {
-        'medium': 'col-md-6 col-xl-3',  // 4 per row on xl, 2 per row on md
-        'large': 'col-12'               // Full width
+        'small': 'col-md-6 col-xl-3',  // 4 per row on xl, 2 per row on smaller screens
+        'medium': 'col-md-6',          // 2 per row on all screens
+        'large': 'col-12'              // Full width
     };
-    return classes[size] || 'col-md-6 col-xl-3';
+    return classes[size] || 'col-md-6 col-xl-3'; // Default to small
 }
 
 // Update the initializeSortable function
@@ -665,5 +693,16 @@ function initializeSortable() {
             evt.item.classList.remove('is-dragging');
             updateWidgetPositions();
         }
+    });
+}
+
+function initializeDropdowns() {
+    document.querySelectorAll('.size-option').forEach(option => {
+        option.addEventListener('click', function(e) {
+            e.preventDefault();
+            const widgetId = this.dataset.widgetId;
+            const newSize = this.dataset.size;
+            resizeWidget(widgetId, newSize);
+        });
     });
 }

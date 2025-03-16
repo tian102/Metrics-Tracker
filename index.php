@@ -102,6 +102,10 @@ $prCount = $db->single()['count'];
                             </ul>
                         </div>
 
+                        <a href="dashboard_settings.php" class="btn btn-outline-secondary" title="Dashboard Settings">
+                            <i class="fas fa-cog"></i>
+                        </a>
+
                         <?php if ($prCount > 0): ?>
                             <a href="#" id="viewPRsBtn" class="btn btn-warning position-relative">
                                 <i class="fas fa-trophy me-1"></i>New PRs
