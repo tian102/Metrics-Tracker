@@ -28,21 +28,45 @@ function processVisualizationData(dailyMetrics, trainingSessions, workoutDetails
         }
     });
     
-    // ----- DAILY METRICS CHARTS -----
-    createWeightProgressChart(dailyMetrics);
-    createSleepDurationChart(dailyMetrics);
-    createPersonalMetricsChart(dailyMetrics);
-    
-    // ----- NUTRITION CHARTS -----
-    createCaloriesChart(dailyMetrics);
-    createMacronutrientsChart(dailyMetrics);
-    createWaterIntakeChart(dailyMetrics);
-    
-    // ----- TRAINING CHARTS -----
-    createMuscleGroupVolumeChart(workoutDetails);
-    setupExerciseProgressChart(workoutDetails);
-    createStimulusFatigueChart(workoutDetails);
-    createTrainingDurationChart(trainingSessions);
+    try {
+        // Daily Metrics Charts
+        if (document.getElementById('weightProgressChart')) {
+            createWeightProgressChart(dailyMetrics);
+        }
+        if (document.getElementById('sleepDurationChart')) {
+            createSleepDurationChart(dailyMetrics);
+        }
+        if (document.getElementById('personalMetricsChart')) {
+            createPersonalMetricsChart(dailyMetrics);
+        }
+
+        // Nutrition Charts
+        if (document.getElementById('caloriesChart')) {
+            createCaloriesChart(dailyMetrics);
+        }
+        if (document.getElementById('macronutrientsChart')) {
+            createMacronutrientsChart(dailyMetrics);
+        }
+        if (document.getElementById('waterIntakeChart')) {
+            createWaterIntakeChart(dailyMetrics);
+        }
+
+        // Training Charts
+        if (document.getElementById('muscleGroupVolumeChart')) {
+            createMuscleGroupVolumeChart(workoutDetails);
+        }
+        if (document.getElementById('exerciseProgressChartWrapper')) {
+            setupExerciseProgressChart(workoutDetails);
+        }
+        if (document.getElementById('stimulusFatigueChart')) {
+            createStimulusFatigueChart(workoutDetails);
+        }
+        if (document.getElementById('trainingDurationChart')) {
+            createTrainingDurationChart(trainingSessions);
+        }
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+    }
 }
 
 /**
@@ -82,7 +106,13 @@ function getChartColor(index) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createSleepDurationChart(dailyMetrics) {
-    const ctx = document.getElementById('sleepDurationChart').getContext('2d');
+    const canvas = document.getElementById('sleepDurationChart');
+    if (!canvas) {
+        console.error('Sleep Duration Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process sleep data
     const labels = [];
@@ -155,7 +185,13 @@ function createSleepDurationChart(dailyMetrics) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createWeightProgressChart(dailyMetrics) {
-    const ctx = document.getElementById('weightProgressChart').getContext('2d');
+    const canvas = document.getElementById('weightProgressChart');
+    if (!canvas) {
+        console.error('Weight Progress Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process weight data
     const labels = [];
@@ -224,7 +260,13 @@ function createWeightProgressChart(dailyMetrics) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createPersonalMetricsChart(dailyMetrics) {
-    const ctx = document.getElementById('personalMetricsChart').getContext('2d');
+    const canvas = document.getElementById('personalMetricsChart');
+    if (!canvas) {
+        console.error('Personal Metrics Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process personal metrics data
     const labels = [];
@@ -318,7 +360,13 @@ function createPersonalMetricsChart(dailyMetrics) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createCaloriesChart(dailyMetrics) {
-    const ctx = document.getElementById('caloriesChart').getContext('2d');
+    const canvas = document.getElementById('caloriesChart');
+    if (!canvas) {
+        console.error('Calories Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process calories data
     const labels = [];
@@ -385,7 +433,13 @@ function createCaloriesChart(dailyMetrics) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createMacronutrientsChart(dailyMetrics) {
-    const ctx = document.getElementById('macronutrientsChart').getContext('2d');
+    const canvas = document.getElementById('macronutrientsChart');
+    if (!canvas) {
+        console.error('Macronutrients Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process macronutrients data
     const labels = [];
@@ -465,7 +519,13 @@ function createMacronutrientsChart(dailyMetrics) {
  * @param {Array} dailyMetrics - Array of daily metrics data
  */
 function createWaterIntakeChart(dailyMetrics) {
-    const ctx = document.getElementById('waterIntakeChart').getContext('2d');
+    const canvas = document.getElementById('waterIntakeChart');
+    if (!canvas) {
+        console.error('Water Intake Chart canvas not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
     
     // Process water intake data
     const labels = [];
@@ -588,6 +648,16 @@ function setupExerciseProgressChart(workoutDetails) {
     const chartContainer = document.getElementById('exerciseProgressChartWrapper');
     let currentChart = null;
 
+    // Add hidden input to form
+    const dateRangeForm = document.getElementById('dateRangeForm');
+    let exerciseInput = dateRangeForm.querySelector('input[name="selected_exercise"]');
+    if (!exerciseInput) {
+        exerciseInput = document.createElement('input');
+        exerciseInput.type = 'hidden';
+        exerciseInput.name = 'selected_exercise';
+        dateRangeForm.appendChild(exerciseInput);
+    }
+
     // Function to safely destroy and recreate canvas
     function resetChart() {
         // Destroy any existing chart
@@ -595,24 +665,21 @@ function setupExerciseProgressChart(workoutDetails) {
             currentChart.destroy();
         }
         
-        // Clear any other chart instances that might exist
-        const canvas = document.getElementById('exerciseProgressChart');
-        if (canvas) {
-            const existingChart = Chart.getChart(canvas);
-            if (existingChart) {
-                existingChart.destroy();
-            }
-        }
-
         // Remove and recreate canvas
-        const oldCanvas = document.getElementById('exerciseProgressChart');
-        if (oldCanvas) {
-            oldCanvas.remove();
+        const chartContainer = document.getElementById('exerciseProgressChartWrapper');
+        if (!chartContainer) {
+            console.error('Chart container not found');
+            return null;
         }
         
+        // Clear existing canvas
+        chartContainer.innerHTML = '';
+        
+        // Create new canvas
         const newCanvas = document.createElement('canvas');
         newCanvas.id = 'exerciseProgressChart';
         chartContainer.appendChild(newCanvas);
+        
         return newCanvas;
     }
 
@@ -624,12 +691,34 @@ function setupExerciseProgressChart(workoutDetails) {
 
     // Handle exercise selection changes
     exerciseSelector.addEventListener('change', function() {
+        exerciseInput.value = this.value;
+        
         const selectedExercise = this.value;
         if (selectedExercise) {
             const canvas = resetChart();
             currentChart = createExerciseProgressChart(workoutDetails, selectedExercise, canvas);
         }
     });
+    
+    // Check for pre-selected exercise from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const preSelectedExercise = urlParams.get('selected_exercise');
+    
+    if (preSelectedExercise) {
+        exerciseSelector.value = preSelectedExercise;
+        exerciseInput.value = preSelectedExercise;
+        
+        // Trigger chart creation
+        if (exerciseSelector.value) {
+            const canvas = resetChart();
+            currentChart = createExerciseProgressChart(workoutDetails, exerciseSelector.value, canvas);
+        }
+    } else if (exerciseSelector.value) {
+        // Default behavior
+        exerciseInput.value = exerciseSelector.value;
+        const canvas = resetChart();
+        currentChart = createExerciseProgressChart(workoutDetails, exerciseSelector.value, canvas);
+    }
 }
 
 /**
