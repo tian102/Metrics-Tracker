@@ -80,12 +80,11 @@ function loadWidgets(widgets, view) {
     const endDateString = endDate.toISOString().split('T')[0];
     
     // Create rows based on widget sizes
-    let html = `
-        <div class="row gx-3 mb-4">
-    `;
+    let html = `<div class="row g-4">`;
     
     widgets.forEach(widget => {
-        const sizeClass = widget.widget_size === 'large' ? 'col-xl-12' : 'col-md-6 col-xl-3';
+        // Update size class logic to match dashboard-settings.js
+        const sizeClass = getSizeClass(widget.widget_size);
         
         html += `
             <div class="${sizeClass} mb-4">
@@ -105,11 +104,18 @@ function loadWidgets(widgets, view) {
         `;
     });
     
-    html += `
-        </div>
-    `;
-    
+    html += `</div>`;
     container.innerHTML = html;
+
+    // Add getSizeClass function at the top of dashboard.js
+    function getSizeClass(size) {
+        const classes = {
+            'small': 'col-md-6 col-xl-3',  // 4 per row on xl, 2 per row on smaller screens
+            'medium': 'col-md-6',          // 2 per row on all screens
+            'large': 'col-12'              // Full width
+        };
+        return classes[size] || 'col-md-6 col-xl-3'; // Default to small
+    }
     
     // Load content for each widget
     widgets.forEach(widget => {
