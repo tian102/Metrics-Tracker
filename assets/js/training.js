@@ -36,15 +36,19 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Raw API responses:', { muscleGroups, equipment, exercises });
             
             if (muscleGroups.success) {
-                exerciseData.muscleGroups = muscleGroups.data || [];
+                exerciseData.muscleGroups = muscleGroups.data;
             }
+            
             if (equipment.success) {
-                exerciseData.equipment = equipment.data || [];
+                exerciseData.equipment = equipment.data;
             }
+            
             if (exercises.success) {
-                // Make sure we're getting the exercises array, not the pagination object
-                exerciseData.exercises = exercises.data.exercises || [];
+                exerciseData.exercises = exercises.data;
             }
+            
+            // Process and normalize the data - calling the function with exerciseData as parameter
+            processExerciseData(exerciseData);
     
             console.log('Processed exercise data:', exerciseData);
         })
@@ -81,8 +85,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const equipmentSelect = createSelectElement('equipment', exerciseData.equipment, 
             'name', 'name', existingValues.equipment);
         
+        // Fixed: Use 'name' as the value field for exercises since that's what's in the API data
         const exerciseSelect = createSelectElement('exercise_name', exerciseData.exercises, 
-            'exercise_name', 'exercise_name', existingValues.exercise_name);
+            'name', 'name', existingValues.exercise_name);
         
         // Replace existing inputs with new selects
         replaceInput(form, '[name="muscle_group"]', muscleGroupSelect);
@@ -277,67 +282,72 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect) {
-        muscleGroupSelect.addEventListener('change', () => {
-            if (!isRestoringState) {
-                console.log('Muscle group changed to:', muscleGroupSelect.value);
-                
-                // If "Add New..." is selected, we don't need to filter equipment
-                if (muscleGroupSelect.value.startsWith('add_new_')) {
-                    return;
-                }
-                
-                // Get all equipment used with this muscle group
-                const compatibleEquipment = exerciseData.exercises
-                    .filter(ex => ex.muscle_group === muscleGroupSelect.value)
-                    .map(ex => ex.equipment);
-                
-                // Create unique list
-                const uniqueEquipment = [...new Set(compatibleEquipment)];
-                
-                console.log('Compatible equipment:', uniqueEquipment);
-                
-                // If no compatible equipment is found, don't filter the equipment dropdown
-                // This allows users to add equipment for new muscle groups
-                if (uniqueEquipment.length === 0) {
-                    console.log('No compatible equipment found, keeping all options');
-                    // Just reset the equipment dropdown without filtering
-                    resetSelect(equipmentSelect);
-                } else {
-                    // Reset equipment dropdown then filter
-                    resetSelect(equipmentSelect);
-                    filterSelectOptions(equipmentSelect, uniqueEquipment);
-                }
-                
-                // Reset exercise dropdown
-                resetSelect(exerciseSelect);
+        // Listen for muscle group changes
+        muscleGroupSelect.addEventListener('change', function() {
+            if (isRestoringState) return;
+            
+            const selectedMuscleGroup = this.value;
+            console.log('Muscle group changed to:', selectedMuscleGroup);
+            
+            // Reset equipment and exercise dropdowns
+            resetSelect(equipmentSelect);
+            resetSelect(exerciseSelect);
+            
+            // Skip filtering if it's an "Add New" option or empty selection
+            if (!selectedMuscleGroup || selectedMuscleGroup.startsWith('add_new_')) {
+                return;
             }
+            
+            // Find compatible equipment for this muscle group
+            const compatibleEquipment = [];
+            exerciseData.exercises.forEach(exercise => {
+                if (exercise.muscle_group === selectedMuscleGroup) {
+                    // Check if this equipment is already in our array
+                    if (!compatibleEquipment.includes(exercise.equipment)) {
+                        compatibleEquipment.push(exercise.equipment);
+                    }
+                }
+            });
+            
+            console.log('Compatible equipment:', compatibleEquipment);
+            
+            // Show only compatible equipment options
+            filterSelectOptions(equipmentSelect, compatibleEquipment);
         });
-    
-        equipmentSelect.addEventListener('change', () => {
-            if (!isRestoringState) {
-                console.log('Equipment changed to:', equipmentSelect.value);
-                
-                // If "Add New..." is selected, we don't need to filter exercises
-                if (equipmentSelect.value.startsWith('add_new_')) {
-                    return;
-                }
-                
-                // Filter exercises by both muscle group and equipment
-                const filteredExercises = exerciseData.exercises
-                    .filter(ex => 
-                        ex.muscle_group === muscleGroupSelect.value && 
-                        ex.equipment === equipmentSelect.value
-                    )
-                    .map(ex => ex.exercise_name);
-                        
-                console.log('Compatible exercises:', filteredExercises);
-                
-                // Reset exercise dropdown
-                resetSelect(exerciseSelect);
-                
-                // Filter exercise options
-                filterSelectOptions(exerciseSelect, filteredExercises);
+        
+        // Listen for equipment changes
+        equipmentSelect.addEventListener('change', function() {
+            if (isRestoringState) return;
+            
+            const selectedMuscleGroup = muscleGroupSelect.value;
+            const selectedEquipment = this.value;
+            console.log('Equipment changed to:', selectedEquipment);
+            
+            // Reset exercise select
+            resetSelect(exerciseSelect);
+            
+            // Skip filtering if either selection is empty or "Add New"
+            if (!selectedMuscleGroup || !selectedEquipment || 
+                selectedMuscleGroup.startsWith('add_new_') || 
+                selectedEquipment.startsWith('add_new_')) {
+                return;
             }
+            
+            // Find exercises that match both muscle group and equipment
+            const compatibleExercises = [];
+            exerciseData.exercises.forEach(exercise => {
+                // Only use exercises that exactly match both muscle group and equipment
+                if (exercise.muscle_group === selectedMuscleGroup && 
+                    exercise.equipment === selectedEquipment) {
+                    // Fixed: Use 'name' for exercise names
+                    compatibleExercises.push(exercise.name);
+                }
+            });
+            
+            console.log('Compatible exercises:', compatibleExercises);
+            
+            // Show only compatible exercise options
+            filterSelectOptions(exerciseSelect, compatibleExercises);
         });
     }
 
@@ -1164,4 +1174,153 @@ function setupExerciseForm(formId, exerciseContainerId, exerciseData = null) {
             </div>
         `;
     });
+
+}
+// ...existing code...
+
+/**
+ * Setup cascading dropdown filters for muscle groups, equipment, and exercises
+ * @param {HTMLSelectElement} muscleGroupSelect - Muscle group select element
+ * @param {HTMLSelectElement} equipmentSelect - Equipment select element
+ * @param {HTMLSelectElement} exerciseSelect - Exercise select element
+ */
+function setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect) {
+    // Flag to prevent triggering cascading events during state restoration
+    let isUpdating = false;
+
+    // Listen for muscle group changes
+    muscleGroupSelect.addEventListener('change', function() {
+        if (isRestoringState) return;
+        
+        const muscleGroupValue = this.value;
+        console.log('Muscle group changed to:', muscleGroupValue);
+        
+        // Reset equipment and exercise selects
+        resetSelect(equipmentSelect);
+        resetSelect(exerciseSelect);
+        
+        // Skip filtering if it's an "Add New" option or empty selection
+        if (!muscleGroupValue || muscleGroupValue.startsWith('add_new_')) {
+            return;
+        }
+        
+        // Find compatible equipment for this muscle group
+        const compatibleEquipment = [];
+        exerciseData.exercises.forEach(exercise => {
+            if (exercise.muscle_group === muscleGroupValue) {
+                // Check if this equipment is already in our array
+                if (!compatibleEquipment.includes(exercise.equipment)) {
+                    compatibleEquipment.push(exercise.equipment);
+                }
+            }
+        });
+        
+        console.log('Compatible equipment:', compatibleEquipment);
+        
+        // Show only compatible equipment options
+        filterSelectOptions(equipmentSelect, compatibleEquipment);
+    });
+    
+    // Listen for equipment changes
+    equipmentSelect.addEventListener('change', function() {
+        if (isRestoringState) return;
+        
+        const muscleGroupValue = muscleGroupSelect.value;
+        const equipmentValue = this.value;
+        console.log('Equipment changed to:', equipmentValue);
+        
+        // Reset exercise select
+        resetSelect(exerciseSelect);
+        
+        // Skip filtering if either selection is empty or "Add New"
+        if (!muscleGroupValue || !equipmentValue || 
+            muscleGroupValue.startsWith('add_new_') || 
+            equipmentValue.startsWith('add_new_')) {
+            return;
+        }
+        
+        // Find exercises that match both muscle group and equipment
+        const compatibleExercises = [];
+        exerciseData.exercises.forEach(exercise => {
+            if (exercise.muscle_group === muscleGroupValue && 
+                exercise.equipment === equipmentValue) {
+                compatibleExercises.push(exercise.exercise_name);
+            }
+        });
+        
+        console.log('Compatible exercises:', compatibleExercises);
+        
+        // Show only compatible exercise options
+        filterSelectOptions(exerciseSelect, compatibleExercises);
+    });
+}
+
+/**
+ * Filter select options while preserving the "Add New..." option
+ * @param {HTMLSelectElement} selectElement - The select element to filter
+ * @param {Array} allowedValues - Values to keep visible
+ */
+function filterSelectOptions(selectElement, allowedValues) {
+    const options = selectElement.options;
+    let hasVisibleOptions = false;
+    
+    // Skip the first option (the placeholder) and handle all regular options
+    for (let i = 1; i < options.length; i++) {
+        // Skip the "Add New..." option - we'll handle it separately
+        if (options[i].value.startsWith('add_new_')) {
+            continue;
+        }
+        
+        if (!allowedValues.includes(options[i].value)) {
+            options[i].style.display = 'none';
+            options[i].disabled = true;
+        } else {
+            options[i].style.display = '';
+            options[i].disabled = false;
+            hasVisibleOptions = true;
+        }
+    }
+    
+    // Always make sure the "Add New..." option is visible
+    for (let i = 0; i < options.length; i++) {
+        if (options[i].value.startsWith('add_new_')) {
+            options[i].style.display = '';
+            options[i].disabled = false;
+        }
+    }
+}
+
+/**
+ * Reset a select to its default state while preserving the "Add New..." option
+ * @param {HTMLSelectElement} selectElement - The select element to reset
+ */
+function resetSelect(selectElement) {
+    selectElement.selectedIndex = 0;
+    
+    // Re-enable all options
+    const options = selectElement.options;
+    for (let i = 1; i < options.length; i++) {
+        // Always preserve the visibility of the "Add New..." option
+        if (!options[i].value.startsWith('add_new_')) {
+            options[i].style.display = '';
+            options[i].disabled = false;
+        }
+    }
+}
+
+/**
+ * Process data from the API and normalize it for our application
+ * @param {Object} data - The exercise data object to process
+ */
+function processExerciseData(data) {
+    // Process exercise data to ensure it has consistent property names
+    data.exercises = data.exercises.map(exercise => {
+        return {
+            ...exercise,
+            // Ensure each exercise has both 'name' and 'exercise_name' properties
+            exercise_name: exercise.name
+        };
+    });
+    
+    console.log('Normalized exercise data:', data);
 }
