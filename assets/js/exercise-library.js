@@ -8,12 +8,12 @@ document.addEventListener('DOMContentLoaded', function() {
     loadLibraryStats();
     loadMuscleGroups();
     loadEquipment();
-    searchExercises();
+    searchExercises(1); // Start with page 1
     
     // Event listeners
     document.getElementById('exerciseSearchForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        searchExercises();
+        searchExercises(1); // Reset to page 1 on new search
     });
     
     document.getElementById('resetFiltersBtn').addEventListener('click', function() {
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('muscleGroupFilter').value = '';
         document.getElementById('equipmentFilter').value = '';
         document.getElementById('sortBy').value = 'exercise_name';
-        searchExercises();
+        searchExercises(1); // Reset to page 1
     });
     
     document.getElementById('showFavoritesBtn').addEventListener('click', function() {
@@ -50,6 +50,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Redirect to training page with pre-selected exercise
         window.location.href = 'training.php?exercise_id=' + exerciseId;
+    });
+    
+    // Pagination event delegation
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('page-link')) {
+            e.preventDefault();
+            const pageNum = e.target.dataset.page;
+            if (pageNum) {
+                searchExercises(parseInt(pageNum));
+            }
+        }
     });
 });
 
@@ -155,12 +166,14 @@ function loadEquipment() {
 
 /**
  * Search exercises based on the current filter values
+ * @param {number} page Current page number
  */
-function searchExercises() {
+function searchExercises(page = 1) {
     const searchTerm = document.getElementById('searchTerm').value;
     const muscleGroup = document.getElementById('muscleGroupFilter').value;
     const equipment = document.getElementById('equipmentFilter').value;
     const sortBy = document.getElementById('sortBy').value;
+    const itemsPerPage = 12; // Number of items to show per page
     
     // Show loading state
     document.getElementById('exerciseResults').innerHTML = `
@@ -177,6 +190,8 @@ function searchExercises() {
     if (muscleGroup) url += '&muscle_group=' + encodeURIComponent(muscleGroup);
     if (equipment) url += '&equipment=' + encodeURIComponent(equipment);
     url += '&order_by=' + sortBy;
+    url += '&page=' + page;
+    url += '&limit=' + itemsPerPage;
     
     fetch(url)
         .then(response => {
@@ -187,14 +202,15 @@ function searchExercises() {
         })
         .then(result => {
             if (result.success) {
-                const exercises = result.data;
+                const exercises = result.data.exercises;
+                const pagination = result.data.pagination;
                 
                 // Update result count
-                document.getElementById('resultCount').textContent = exercises.length;
+                document.getElementById('resultCount').textContent = pagination.total_count;
                 
                 if (exercises.length > 0) {
                     document.getElementById('noResultsMessage').style.display = 'none';
-                    renderExerciseResults(exercises);
+                    renderExerciseResults(exercises, false, pagination);
                 } else {
                     document.getElementById('exerciseResults').innerHTML = '';
                     document.getElementById('noResultsMessage').style.display = 'block';
@@ -262,8 +278,9 @@ function loadFavoriteExercises() {
  * Render exercise results to the page
  * @param {Array} exercises Array of exercise objects
  * @param {boolean} showUsage Whether to show usage count
+ * @param {Object} pagination Pagination data object
  */
-function renderExerciseResults(exercises, showUsage = false) {
+function renderExerciseResults(exercises, showUsage = false, pagination = null) {
     const resultsContainer = document.getElementById('exerciseResults');
     
     // Create rows of exercise cards
@@ -298,7 +315,99 @@ function renderExerciseResults(exercises, showUsage = false) {
     });
     
     html += '</div>';
+    
+    // Add pagination controls if pagination data exists
+    if (pagination && pagination.total_pages > 1) {
+        html += renderPaginationControls(pagination);
+    }
+    
     resultsContainer.innerHTML = html;
+}
+
+/**
+ * Render pagination controls
+ * @param {Object} pagination Pagination data
+ * @returns {string} HTML for pagination controls
+ */
+function renderPaginationControls(pagination) {
+    let html = `
+    <nav aria-label="Exercise pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+    `;
+    
+    // Previous button
+    html += `
+        <li class="page-item ${pagination.current_page === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${pagination.current_page - 1}" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+    `;
+    
+    // Page numbers
+    const startPage = Math.max(1, pagination.current_page - 2);
+    const endPage = Math.min(pagination.total_pages, pagination.current_page + 2);
+    
+    // First page link if not starting at 1
+    if (startPage > 1) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" data-page="1">1</a>
+            </li>
+        `;
+        
+        // Add ellipsis if needed
+        if (startPage > 2) {
+            html += `
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">...</a>
+                </li>
+            `;
+        }
+    }
+    
+    // Page numbers
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <li class="page-item ${pagination.current_page === i ? 'active' : ''}">
+                <a class="page-link" href="#" data-page="${i}">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Last page link if not ending at last page
+    if (endPage < pagination.total_pages) {
+        // Add ellipsis if needed
+        if (endPage < pagination.total_pages - 1) {
+            html += `
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">...</a>
+                </li>
+            `;
+        }
+        
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" data-page="${pagination.total_pages}">${pagination.total_pages}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    html += `
+        <li class="page-item ${pagination.current_page === pagination.total_pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${pagination.current_page + 1}" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+    `;
+    
+    html += `
+        </ul>
+    </nav>
+    `;
+    
+    return html;
 }
 
 /**

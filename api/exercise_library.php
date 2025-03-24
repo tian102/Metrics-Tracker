@@ -288,6 +288,18 @@ function searchExercises($userId) {
         $params[':search'] = '%' . $_GET['search'] . '%';
     }
     
+    // Get total count for pagination
+    $countQuery = str_replace("SELECT e.id, e.name AS exercise_name, m.name AS muscle_group, eq.name AS equipment", "SELECT COUNT(*) as total", $query);
+    $db->query($countQuery);
+    
+    // Bind parameters for count query
+    foreach ($params as $param => $value) {
+        $db->bind($param, $value);
+    }
+    
+    $countResult = $db->single();
+    $totalCount = $countResult['total'];
+    
     // Order by specified field or default to name
     $orderBy = isset($_GET['order_by']) ? $_GET['order_by'] : 'exercise_name';
     $direction = isset($_GET['direction']) && strtolower($_GET['direction']) === 'desc' ? 'DESC' : 'ASC';
@@ -301,6 +313,20 @@ function searchExercises($userId) {
     // Add order by clause
     $query .= " ORDER BY " . $orderBy . " " . $direction;
     
+    // Pagination parameters
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 12;
+    
+    // Validate pagination parameters
+    if ($page < 1) $page = 1;
+    if ($limit < 1 || $limit > 100) $limit = 12;
+    
+    // Calculate offset
+    $offset = ($page - 1) * $limit;
+    
+    // Add pagination to query
+    $query .= " LIMIT :limit OFFSET :offset";
+    
     // Execute query
     $db->query($query);
     
@@ -309,10 +335,31 @@ function searchExercises($userId) {
         $db->bind($param, $value);
     }
     
+    // Bind pagination parameters
+    $db->bind(':limit', $limit);
+    $db->bind(':offset', $offset);
+    
     // Get results
     $exercises = $db->resultSet();
     
-    echo json_encode(['success' => true, 'data' => $exercises]);
+    // Calculate pagination metadata
+    $totalPages = ceil($totalCount / $limit);
+    
+    $paginationData = [
+        'total_count' => $totalCount,
+        'total_pages' => $totalPages,
+        'current_page' => $page,
+        'limit' => $limit
+    ];
+    
+    // Return both exercises and pagination data
+    echo json_encode([
+        'success' => true, 
+        'data' => [
+            'exercises' => $exercises,
+            'pagination' => $paginationData
+        ]
+    ]);
 }
 
 /**
