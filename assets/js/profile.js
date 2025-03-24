@@ -474,3 +474,58 @@ function trackExerciseUsage(exerciseId) {
         console.error('Error tracking exercise usage:', error);
     });
 }
+
+// ...existing code...
+
+/**
+ * Handle removing all user data
+ */
+function removeAllData() {
+    // Show confirmation modal
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    document.getElementById('confirmModalTitle').textContent = 'Remove All Data';
+    document.getElementById('confirmModalBody').textContent = 'Are you sure you want to remove ALL of your data? This action cannot be undone.';
+    document.getElementById('confirmModalBtn').textContent = 'Remove All Data';
+    document.getElementById('confirmModalBtn').classList.add('btn-danger');
+    
+    // Set up the confirm button action
+    document.getElementById('confirmModalBtn').onclick = function() {
+        // Hide the modal
+        confirmModal.hide();
+        
+        // Show loading
+        showLoading();
+        
+        // Make API request to remove all data
+        fetch('api/account.php?action=remove_all_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            hideLoading();
+            
+            if (result.success) {
+                showAlert('success', 'All your data has been successfully removed.', 'success-message');
+                
+                // Refresh the page after a short delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showAlert('danger', 'Error: ' + result.message, 'error-message');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('danger', 'Error: ' + error.message, 'error-message');
+        });
+    };
+    
+    // Show the confirmation modal
+    confirmModal.show();
+}
+
+// ...existing code...

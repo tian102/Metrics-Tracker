@@ -1611,3 +1611,96 @@ body {
         margin-bottom: 1rem !important;
     }
 }
+
+/* Exercise Library Pagination Styling */
+.pagination {
+    display: flex;
+    flex-wrap: nowrap;
+    padding-left: 0;
+    list-style: none;
+}
+
+.pagination.pagination-responsive {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    justify-content: center !important;
+}
+
+.pagination .page-item {
+    margin: 0 2px;
+}
+
+.pagination .page-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.375rem 0.75rem;
+    min-width: 2.25rem; /* Ensure minimum width for touch targets */
+}
+
+/* Better mobile pagination layout */
+@media (max-width: 576px) {
+    .pagination {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    
+    .pagination .page-item {
+        display: inline-flex !important;
+        margin: 0 1px;
+    }
+    
+    /* Show only important pagination items on mobile */
+    .pagination .page-item.d-sm-none,
+    .pagination .page-item:first-child,
+    .pagination .page-item:last-child {
+        display: inline-flex !important;
+    }
+    
+    /* Mobile current page styling */
+    .pagination .page-item.mobile-current {
+        order: 0; /* Ensure it stays in the middle */
+    }
+    
+    .pagination .page-link {
+        min-width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.375rem;
+    }
+    
+    /* Force horizontal layout */
+    .pagination.pagination-responsive {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        width: auto;
+    }
+}
+
+/* Fix layout overflow issues */
+.pagination-container {
+    overflow-x: auto;
+    width: 100%;
+}
+
+/* Make pagination controls more touch-friendly on mobile */
+@media (max-width: 576px) {
+    .page-link {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+/* Ensure consistent pagination height */
+.card-header .pagination {
+    margin-bottom: 0;
+}
+
+/* Prevent overflow in card header */
+.card-header {
+    overflow: visible;
+}
