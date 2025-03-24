@@ -7,18 +7,35 @@ header("Pragma: no-cache");
 <?php
 require_once 'includes/header.php';
 require_once 'includes/functions.php';
+require_once 'includes/user_functions.php';
 
 // Redirect if not logged in
 requireLogin();
+
+// Ensure we're using the correct user ID from the session
+$userId = $_SESSION['user_id'];
 
 // Get date range for filters - default to last 30 days
 $endDate = date('Y-m-d');
 $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
 $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : $endDate;
 
-// Get data for the selected period
-$dailyMetrics = getDailyMetricsRange($startDate, $endDate);
-$trainingSessions = getTrainingSessionsRange($startDate, $endDate);
+// Get data for the selected period - make sure we're getting current user's data
+$db = new Database();
+
+// Get daily metrics data
+$db->query("SELECT * FROM daily_metrics WHERE user_id = :user_id AND date BETWEEN :start_date AND :end_date ORDER BY date");
+$db->bind(':user_id', $userId);
+$db->bind(':start_date', $startDate);
+$db->bind(':end_date', $endDate);
+$dailyMetrics = $db->resultSet();
+
+// Get training sessions data
+$db->query("SELECT * FROM training_sessions WHERE user_id = :user_id AND date BETWEEN :start_date AND :end_date ORDER BY date DESC");
+$db->bind(':user_id', $userId);
+$db->bind(':start_date', $startDate);
+$db->bind(':end_date', $endDate);
+$trainingSessions = $db->resultSet();
 
 // Get active tab from request if available
 $activeTab = isset($_GET['active_tab']) ? $_GET['active_tab'] : 'daily-metrics-tab';
@@ -34,10 +51,16 @@ if (!in_array($activeTab, $validTabIds)) {
 // Process training sessions to get workout details
 $workoutDetails = [];
 foreach ($trainingSessions as $session) {
-    $sessionWorkouts = getWorkoutDetails($session['id']);
+    // Get workout details using direct DB query to ensure we get right user's data
+    $db->query("SELECT wd.*, ts.date as session_date, ts.mesocycle_name 
+                FROM workout_details wd 
+                JOIN training_sessions ts ON wd.session_id = ts.id 
+                WHERE wd.session_id = :session_id AND ts.user_id = :user_id");
+    $db->bind(':session_id', $session['id']);
+    $db->bind(':user_id', $userId);
+    $sessionWorkouts = $db->resultSet();
+    
     foreach ($sessionWorkouts as $workout) {
-        $workout['session_date'] = $session['date'];
-        $workout['mesocycle_name'] = $session['mesocycle_name'];
         $workoutDetails[] = $workout;
     }
 }
@@ -305,12 +328,34 @@ foreach ($trainingSessions as $session) {
 const dailyMetricsData = <?php echo json_encode($dailyMetrics); ?>;
 const trainingSessionsData = <?php echo json_encode($trainingSessions); ?>;
 const workoutDetailsData = <?php echo json_encode($workoutDetails); ?>;
+const currentUserId = <?php echo $userId; ?>;
 
 // Process data once DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Data loaded:', {
+        metrics: dailyMetricsData.length + ' records',
+        sessions: trainingSessionsData.length + ' records',
+        workouts: workoutDetailsData.length + ' records'
+    });
+    
     // Process and display charts
     processVisualizationData(dailyMetricsData, trainingSessionsData, workoutDetailsData);
 });
+
+/**
+ * Load chart data from API
+ * @param {number} userId - The current user ID
+ */
+function loadChartData(userId) {
+    // Modify all fetch calls to include the user_id parameter
+    fetch(`api/visualize.php?action=get_data&metric=${selectedMetric}&user_id=${userId}`)
+        .then(response => response.json())
+        .then(result => {
+            // ...existing code...
+        });
+    
+    // ...existing code...
+}
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {

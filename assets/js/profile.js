@@ -475,8 +475,6 @@ function trackExerciseUsage(exerciseId) {
     });
 }
 
-// ...existing code...
-
 /**
  * Handle removing all user data
  */
@@ -496,36 +494,51 @@ function removeAllData() {
         // Show loading
         showLoading();
         
-        // Make API request to remove all data
-        fetch('api/account.php?action=remove_all_data', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(result => {
+        // Make API request to remove all data - use both endpoints to ensure complete removal
+        Promise.all([
+            // First use user_data.php remove endpoint
+            fetch('api/user_data.php?action=remove', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => response.json()),
+            
+            // Then use account.php remove_all_data endpoint as backup
+            fetch('api/account.php?action=remove_all_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => response.json())
+        ])
+        .then(([result1, result2]) => {
             hideLoading();
             
-            if (result.success) {
+            if (result1.success && result2.success) {
                 showAlert('success', 'All your data has been successfully removed.', 'success-message');
                 
                 // Refresh the page after a short delay
                 setTimeout(() => {
                     window.location.reload();
                 }, 2000);
+            } else if (result1.success || result2.success) {
+                showAlert('warning', 'Some of your data may have been removed. Please try again.', 'warning-message');
+                
+                // Log the error details
+                console.error('Data removal partial success:', { result1, result2 });
             } else {
-                showAlert('danger', 'Error: ' + result.message, 'error-message');
+                showAlert('danger', 'Error: Failed to remove data. Please try again.', 'error-message');
+                console.error('Data removal failed:', { result1, result2 });
             }
         })
         .catch(error => {
             hideLoading();
             showAlert('danger', 'Error: ' + error.message, 'error-message');
+            console.error('Data removal error:', error);
         });
     };
     
     // Show the confirmation modal
     confirmModal.show();
 }
-
-// ...existing code...

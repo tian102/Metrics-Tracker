@@ -163,12 +163,11 @@ function removeUserData($userId) {
         // Begin transaction
         $db->beginTransaction();
         
-        // Step 1: Get all training sessions for the user
+        // Step 1: Delete training session related data
         $db->query("SELECT id FROM training_sessions WHERE user_id = :user_id");
         $db->bind(':user_id', $userId);
         $trainingSessions = $db->resultSet();
         
-        // Step 2: Delete workout details for these sessions
         if (!empty($trainingSessions)) {
             $sessionIds = array_column($trainingSessions, 'id');
             $idList = implode(',', $sessionIds);
@@ -176,15 +175,72 @@ function removeUserData($userId) {
             $db->execute();
         }
         
-        // Step 3: Delete training sessions
         $db->query("DELETE FROM training_sessions WHERE user_id = :user_id");
         $db->bind(':user_id', $userId);
         $db->execute();
         
-        // Step 4: Delete daily metrics
+        // Step 2: Delete metrics data
         $db->query("DELETE FROM daily_metrics WHERE user_id = :user_id");
         $db->bind(':user_id', $userId);
         $db->execute();
+        
+        // Step 3: Delete correlation insights
+        $db->query("DELETE FROM correlation_insights WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Step 4: Delete dashboard related data
+        $db->query("DELETE FROM dashboard_preferences WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        $db->query("DELETE FROM dashboard_widgets WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Step 5: Delete exercise history
+        $db->query("DELETE FROM user_exercise_history WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Step 6: Delete personal records
+        $db->query("DELETE FROM personal_records WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Step 7: Delete password reset tokens
+        $db->query("DELETE FROM password_reset_tokens WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Verify all data was removed - check tables that were having issues
+        $problemTables = ['correlation_insights', 'dashboard_widgets', 'password_reset_tokens', 
+                          'personal_records', 'user_exercise_history'];
+        
+        $dataRemains = false;
+        foreach ($problemTables as $table) {
+            // Check if the table exists first
+            $db->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name");
+            $db->bind(':table_name', $table);
+            if ($db->rowCount() === 0) {
+                // Table doesn't exist, skip it
+                continue;
+            }
+            
+            $db->query("SELECT COUNT(*) as count FROM $table WHERE user_id = :user_id");
+            $db->bind(':user_id', $userId);
+            $count = $db->single()['count'];
+            
+            if ($count > 0) {
+                error_log("Data removal issue: Table $table still has $count records for user $userId");
+                $dataRemains = true;
+            }
+        }
+        
+        if ($dataRemains) {
+            $db->rollBack();
+            return ['success' => false, 'message' => 'Some user data could not be removed. Please try again or contact support.'];
+        }
         
         // Commit transaction
         $db->commit();
@@ -193,6 +249,7 @@ function removeUserData($userId) {
     } catch (Exception $e) {
         // Rollback transaction on error
         $db->rollBack();
+        error_log("Error removing user data for user $userId: " . $e->getMessage());
         return ['success' => false, 'message' => 'An error occurred while removing data: ' . $e->getMessage()];
     }
 }

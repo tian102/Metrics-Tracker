@@ -452,3 +452,37 @@ function removeAllUserData($userId) {
         return ['success' => false, 'message' => 'An error occurred while removing data: ' . $e->getMessage()];
     }
 }
+
+/**
+ * Get daily metrics for a specific date
+ * @param string $date Date in YYYY-MM-DD format
+ * @return array|bool Metrics data or false if not found
+ */
+function getDailyMetrics($date) {
+    $db = new Database();
+    $userId = $_SESSION['user_id']; // Get the current user ID from session
+    
+    $db->query("SELECT * FROM daily_metrics WHERE date = :date AND user_id = :user_id");
+    $db->bind(':date', $date);
+    $db->bind(':user_id', $userId);
+    
+    return $db->single();
+}
+
+/**
+ * Get daily metrics for a date range
+ * @param string $startDate Start date in YYYY-MM-DD format
+ * @param string $endDate End date in YYYY-MM-DD format
+ * @return array Metrics data
+ */
+function getDailyMetricsRange($startDate, $endDate) {
+    $db = new Database();
+    $userId = $_SESSION['user_id']; // Get the current user ID from session
+    
+    $db->query("SELECT * FROM daily_metrics WHERE date BETWEEN :start_date AND :end_date AND user_id = :user_id ORDER BY date");
+    $db->bind(':start_date', $startDate);
+    $db->bind(':end_date', $endDate);
+    $db->bind(':user_id', $userId);
+    
+    return $db->resultSet();
+}

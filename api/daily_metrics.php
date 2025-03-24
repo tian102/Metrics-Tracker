@@ -102,25 +102,58 @@ switch ($method) {
         break;
         
     case 'DELETE':
-        // Delete daily metrics for a specific date
+        // Consolidate DELETE handling into a single block
         $data = json_decode(file_get_contents('php://input'), true);
         
-        if (!isset($data['date']) || !validateDate($data['date'])) {
-            echo json_encode(['success' => false, 'message' => 'Valid date is required']);
+        // Handle both ID-based and date-based deletion
+        if (isset($data['id']) && is_numeric($data['id'])) {
+            $metricsId = (int)$data['id'];
+            
+            // Check if the metrics entry exists and belongs to the current user
+            $db = new Database();
+            $db->query("SELECT id FROM daily_metrics WHERE id = :id AND user_id = :user_id");
+            $db->bind(':id', $metricsId);
+            $db->bind(':user_id', $userId);
+            $entry = $db->single();
+            
+            if (!$entry) {
+                header('HTTP/1.1 404 Not Found');
+                echo json_encode(['success' => false, 'message' => 'Metrics entry not found or you do not have permission to delete it']);
+                exit;
+            }
+            
+            // Delete the metrics entry
+            $db->query("DELETE FROM daily_metrics WHERE id = :id");
+            $db->bind(':id', $metricsId);
+            
+            if ($db->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Metrics entry deleted successfully']);
+            } else {
+                header('HTTP/1.1 500 Internal Server Error');
+                echo json_encode(['success' => false, 'message' => 'Failed to delete metrics entry']);
+            }
+            exit;
+        } 
+        // Handle date-based deletion (the old path)
+        else if (isset($data['date']) && validateDate($data['date'])) {
+            // Security check: Verify the data belongs to the current user
+            $existingRecord = getDailyMetrics($data['date']);
+            if (!$existingRecord || $existingRecord['user_id'] != $userId) {
+                echo json_encode(['success' => false, 'message' => 'No data found or you do not have permission to delete this data']);
+                exit;
+            }
+            
+            if (deleteDailyMetrics($data['date'])) {
+                echo json_encode(['success' => true, 'message' => 'Daily metrics deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete daily metrics']);
+            }
             exit;
         }
-        
-        // Security check: Verify the data belongs to the current user
-        $existingRecord = getDailyMetrics($data['date']);
-        if (!$existingRecord || $existingRecord['user_id'] != $userId) {
-            echo json_encode(['success' => false, 'message' => 'No data found or you do not have permission to delete this data']);
+        else {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['success' => false, 'message' => 'Either valid metrics ID or date is required']);
             exit;
-        }
-        
-        if (deleteDailyMetrics($data['date'])) {
-            echo json_encode(['success' => true, 'message' => 'Daily metrics deleted successfully']);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to delete daily metrics']);
         }
         break;
         

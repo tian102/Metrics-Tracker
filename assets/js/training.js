@@ -36,16 +36,24 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Raw API responses:', { muscleGroups, equipment, exercises });
             
             if (muscleGroups.success) {
-                exerciseData.muscleGroups = muscleGroups.data;
+                exerciseData.muscleGroups = muscleGroups.data || [];
             }
             if (equipment.success) {
-                exerciseData.equipment = equipment.data;
+                exerciseData.equipment = equipment.data || [];
             }
             if (exercises.success) {
-                exerciseData.exercises = exercises.data;
+                // Make sure we're getting the exercises array, not the pagination object
+                exerciseData.exercises = exercises.data.exercises || [];
             }
     
             console.log('Processed exercise data:', exerciseData);
+        })
+        .catch(error => {
+            console.error('Error loading exercise data:', error);
+            // Initialize with empty arrays to prevent forEach errors
+            exerciseData.muscleGroups = [];
+            exerciseData.equipment = [];
+            exerciseData.exercises = [];
         });
     }
 
@@ -156,8 +164,26 @@ document.addEventListener('DOMContentLoaded', function() {
         defaultOption.textContent = `Select ${name.replace('_', ' ')}`;
         select.appendChild(defaultOption);
         
+        // Ensure options is an array before trying to iterate
+        if (!Array.isArray(options)) {
+            console.error(`Options for ${name} is not an array:`, options);
+            options = []; // Set to empty array to avoid errors
+        }
+        
         // Add available options
         options.forEach(option => {
+            // Verify option is an object with the required fields
+            if (!option || typeof option !== 'object') {
+                console.warn(`Invalid option in ${name}:`, option);
+                return; // Skip this option
+            }
+            
+            // Check if valueField and textField exist
+            if (!(valueField in option) || !(textField in option)) {
+                console.warn(`Option missing required fields (${valueField}, ${textField}):`, option);
+                return; // Skip this option
+            }
+            
             const opt = document.createElement('option');
             opt.value = option[valueField];
             opt.textContent = option[textField];
@@ -1007,3 +1033,135 @@ document.addEventListener('DOMContentLoaded', function() {
     // Start initialization
     init();
 });
+
+/**
+ * Create a select element with options
+ * @param {Object} params Parameters for creating the select element
+ * @returns {HTMLElement} The created select element
+ */
+function createSelectElement(params) {
+    const select = document.createElement('select');
+    select.className = 'form-select ' + (params.className || '');
+    select.id = params.id;
+    select.name = params.name;
+    
+    if (params.required) {
+        select.setAttribute('required', 'required');
+    }
+    
+    // Add default option if needed
+    if (params.placeholder) {
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = "";
+        placeholderOption.textContent = params.placeholder;
+        placeholderOption.disabled = true;
+        placeholderOption.selected = true;
+        select.appendChild(placeholderOption);
+    }
+    
+    // Fix: Ensure options is an array before using forEach
+    const options = params.options || [];
+    
+    // Check if options is iterable before using forEach
+    if (Array.isArray(options)) {
+        options.forEach(option => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.text;
+            
+            if (params.value && params.value === option.value) {
+                optionElement.selected = true;
+            }
+            
+            select.appendChild(optionElement);
+        });
+    } else if (typeof options === 'object' && options !== null) {
+        // Handle case where options might be an object instead of array
+        console.warn('Options provided as object instead of array, attempting to convert');
+        try {
+            // Try to convert object to array if possible
+            const optionsArray = Object.entries(options).map(([value, text]) => ({
+                value,
+                text: text || value
+            }));
+            
+            optionsArray.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.value;
+                optionElement.textContent = option.text;
+                
+                if (params.value && params.value === option.value) {
+                    optionElement.selected = true;
+                }
+                
+                select.appendChild(optionElement);
+            });
+        } catch (e) {
+            console.error('Failed to process options:', e);
+            // Add a default option to prevent the form from breaking
+            const errorOption = document.createElement('option');
+            errorOption.value = "";
+            errorOption.textContent = "Error loading options";
+            select.appendChild(errorOption);
+        }
+    } else {
+        console.error('Invalid options provided to select element:', options);
+        // Add a default option to prevent the form from breaking
+        const errorOption = document.createElement('option');
+        errorOption.value = "";
+        errorOption.textContent = "No options available";
+        select.appendChild(errorOption);
+    }
+    
+    return select;
+}
+
+/**
+ * Setup exercise form
+ * @param {string} formId Form ID
+ * @param {string} exerciseContainerId Container ID for exercise
+ * @param {object} exerciseData Optional exercise data for editing
+ */
+function setupExerciseForm(formId, exerciseContainerId, exerciseData = null) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    
+    const exerciseContainer = document.getElementById(exerciseContainerId);
+    if (!exerciseContainer) return;
+    
+    // Get muscle groups and equipment for dropdowns
+    Promise.all([
+        fetch('api/exercise_library.php?action=muscle_groups').then(response => response.json()),
+        fetch('api/exercise_library.php?action=equipment').then(response => response.json())
+    ])
+    .then(([muscleGroupsResponse, equipmentResponse]) => {
+        if (!muscleGroupsResponse.success || !equipmentResponse.success) {
+            throw new Error('Failed to load form data');
+        }
+        
+        const muscleGroups = muscleGroupsResponse.data.map(item => ({
+            value: item.name,
+            text: item.name
+        }));
+        
+        const equipment = equipmentResponse.data.map(item => ({
+            value: item.name,
+            text: item.name
+        }));
+        
+        // Debug: Check what data is being received
+        console.log('Muscle Groups:', muscleGroups);
+        console.log('Equipment:', equipment);
+        
+        // Now create the form...
+        // ...existing code...
+    })
+    .catch(error => {
+        console.error('Error setting up exercise form:', error);
+        exerciseContainer.innerHTML = `
+            <div class="alert alert-danger">
+                Error: Failed to load form data. Please refresh the page and try again.
+            </div>
+        `;
+    });
+}

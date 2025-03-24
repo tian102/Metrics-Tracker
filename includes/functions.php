@@ -68,16 +68,6 @@ function formatTime($time) {
 }
 
 /**
- * Get daily metrics for a specific date
- */
-function getDailyMetrics($date) {
-    $db = new Database();
-    $db->query("SELECT * FROM daily_metrics WHERE date = :date");
-    $db->bind(':date', $date);
-    return $db->single();
-}
-
-/**
  * Get training sessions for a specific date
  */
 function getTrainingSessions($date) {
@@ -94,17 +84,6 @@ function getWorkoutDetails($sessionId) {
     $db = new Database();
     $db->query("SELECT * FROM workout_details WHERE session_id = :session_id");
     $db->bind(':session_id', $sessionId);
-    return $db->resultSet();
-}
-
-/**
- * Get all daily metrics within a date range
- */
-function getDailyMetricsRange($startDate, $endDate) {
-    $db = new Database();
-    $db->query("SELECT * FROM daily_metrics WHERE date BETWEEN :start_date AND :end_date ORDER BY date DESC");
-    $db->bind(':start_date', $startDate);
-    $db->bind(':end_date', $endDate);
     return $db->resultSet();
 }
 
@@ -464,7 +443,11 @@ function deleteTrainingSession($id) {
  */
 function deleteDailyMetrics($date) {
     $db = new Database();
-    $db->query("DELETE FROM daily_metrics WHERE date = :date");
+    $userId = $_SESSION['user_id']; // Get the current user ID
+    
+    $db->query("DELETE FROM daily_metrics WHERE date = :date AND user_id = :user_id");
     $db->bind(':date', $date);
+    $db->bind(':user_id', $userId);
+    
     return $db->execute();
 }

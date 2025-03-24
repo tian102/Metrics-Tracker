@@ -1704,3 +1704,66 @@ body {
 .card-header {
     overflow: visible;
 }
+
+/* Dashboard list item styling */
+.list-group-item .btn-group {
+    margin-left: 10px;
+}
+
+.list-group-item .btn-group .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.metrics-summary {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.metrics-summary span {
+    margin-right: 12px;
+}
+
+.metrics-summary span:last-child {
+    margin-right: 0;
+}
+
+/* Add these styles to ensure buttons stay side by side */
+
+/* Dashboard list item styling */
+.list-group-item .d-flex .btn {
+    white-space: nowrap;
+    min-width: auto;
+}
+
+/* Ensure flex display works consistently across viewports */
+@media (max-width: 576px) {
+    .list-group-item .d-flex {
+        display: flex !important;
+        flex-wrap: nowrap;
+    }
+    
+    /* Make buttons a bit smaller on mobile */
+    .list-group-item .btn-sm {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Ensure consistent spacing between buttons */
+.list-group-item .d-flex .me-1 {
+    margin-right: 0.25rem !important;
+}
+
+/* Ensure buttons in table cells stay side by side */
+.table td .d-flex {
+    display: flex !important;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+/* Adjust spacing for button icons */
+.btn-sm .fas {
+    margin-right: 2px;
+}

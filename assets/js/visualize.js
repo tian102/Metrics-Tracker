@@ -11,62 +11,75 @@ window.addEventListener('unload', function() {
 });
 
 /**
- * Main function to process data and create charts
- * @param {Array} dailyMetrics - Array of daily metrics data
- * @param {Array} trainingSessions - Array of training sessions data
- * @param {Array} workoutDetails - Array of workout details data
+ * Process visualization data and create charts
+ * @param {Array} dailyMetrics Daily metrics data
+ * @param {Array} trainingSessions Training sessions data
+ * @param {Array} workoutDetails Workout details data
  */
 function processVisualizationData(dailyMetrics, trainingSessions, workoutDetails) {
-    // Date range form handling
-    document.getElementById('dateRangeForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        
-        if (startDate && endDate) {
-            window.location.href = `visualize.php?start_date=${startDate}&end_date=${endDate}`;
-        }
-    });
+    console.log('Processing visualization data');
     
-    try {
-        // Daily Metrics Charts
-        if (document.getElementById('weightProgressChart')) {
-            createWeightProgressChart(dailyMetrics);
-        }
-        if (document.getElementById('sleepDurationChart')) {
-            createSleepDurationChart(dailyMetrics);
-        }
-        if (document.getElementById('personalMetricsChart')) {
-            createPersonalMetricsChart(dailyMetrics);
-        }
-
-        // Nutrition Charts
-        if (document.getElementById('caloriesChart')) {
-            createCaloriesChart(dailyMetrics);
-        }
-        if (document.getElementById('macronutrientsChart')) {
-            createMacronutrientsChart(dailyMetrics);
-        }
-        if (document.getElementById('waterIntakeChart')) {
-            createWaterIntakeChart(dailyMetrics);
-        }
-
-        // Training Charts
-        if (document.getElementById('muscleGroupVolumeChart')) {
-            createMuscleGroupVolumeChart(workoutDetails);
-        }
-        if (document.getElementById('exerciseProgressChartWrapper')) {
-            setupExerciseProgressChart(workoutDetails);
-        }
-        if (document.getElementById('stimulusFatigueChart')) {
-            createStimulusFatigueChart(workoutDetails);
-        }
-        if (document.getElementById('trainingDurationChart')) {
-            createTrainingDurationChart(trainingSessions);
-        }
-    } catch (error) {
-        console.error('Error initializing charts:', error);
+    // Create charts if data is available
+    if (dailyMetrics && dailyMetrics.length > 0) {
+        createWeightChart(dailyMetrics);
+        createSleepChart(dailyMetrics);
+        createPersonalMetricsChart(dailyMetrics);
+        createCaloriesChart(dailyMetrics);
+        createMacronutrientsChart(dailyMetrics);
+        createWaterIntakeChart(dailyMetrics);
+    } else {
+        console.log('No daily metrics data available');
+        showNoDataMessage('weightProgressChart', 'No weight data available for the selected period');
+        showNoDataMessage('sleepDurationChart', 'No sleep data available for the selected period');
+        showNoDataMessage('personalMetricsChart', 'No metrics data available for the selected period');
+        showNoDataMessage('caloriesChart', 'No nutrition data available for the selected period');
+        showNoDataMessage('macronutrientsChart', 'No nutrition data available for the selected period');
+        showNoDataMessage('waterIntakeChart', 'No water intake data available for the selected period');
     }
+    
+    if (trainingSessions && trainingSessions.length > 0) {
+        createTrainingDurationChart(trainingSessions);
+    } else {
+        console.log('No training sessions data available');
+        showNoDataMessage('trainingDurationChart', 'No training data available for the selected period');
+    }
+    
+    if (workoutDetails && workoutDetails.length > 0) {
+        createMuscleGroupVolumeChart(workoutDetails);
+        createStimulusFatigueChart(workoutDetails);
+        
+        // Set up exercise progress chart with selector
+        setupExerciseProgressChart(workoutDetails);
+    } else {
+        console.log('No workout details data available');
+        showNoDataMessage('muscleGroupVolumeChart', 'No workout data available for the selected period');
+        showNoDataMessage('stimulusFatigueChart', 'No workout data available for the selected period');
+        showNoDataMessage('exerciseProgressChart', 'No exercise data available for the selected period');
+    }
+}
+
+/**
+ * Show a message when no data is available for a chart
+ * @param {string} chartId The ID of the chart container
+ * @param {string} message The message to display
+ */
+function showNoDataMessage(chartId, message) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    
+    const parent = canvas.parentElement;
+    
+    // Create a message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'text-center py-5';
+    messageDiv.innerHTML = `
+        <i class="fas fa-chart-line text-muted fa-3x mb-3"></i>
+        <p class="text-muted">${message}</p>
+    `;
+    
+    // Replace the canvas with the message
+    parent.innerHTML = '';
+    parent.appendChild(messageDiv);
 }
 
 /**

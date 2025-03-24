@@ -233,6 +233,88 @@ function loadWidgetContent(widgetId, widgetType, startDate, endDate) {
 }
 
 /**
+ * Load recent daily metrics data from API
+ */
+function loadRecentMetrics() {
+    const endDate = new Date();
+    let startDate = new Date();
+    startDate.setDate(startDate.getDate() - 14); // Get the last 14 days
+    
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+    
+    fetch(`api/dashboard.php?action=get_data&widget_type=recent_daily&start_date=${startDateString}&end_date=${endDateString}`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                const recentMetricsContainer = document.getElementById('recentMetricsContainer');
+                if (recentMetricsContainer) {
+                    renderRecentMetrics(result.data, result.date_range);
+                }
+            } else {
+                console.error('Failed to load recent metrics:', result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading recent metrics:', error);
+        });
+}
+
+/**
+ * Load recent training sessions data from API
+ */
+function loadRecentSessions() {
+    const endDate = new Date();
+    let startDate = new Date();
+    startDate.setDate(startDate.getDate() - 14); // Get the last 14 days
+    
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+    
+    fetch(`api/dashboard.php?action=get_data&widget_type=recent_training&start_date=${startDateString}&end_date=${endDateString}`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                const recentSessionsContainer = document.getElementById('recentSessionsContainer');
+                if (recentSessionsContainer) {
+                    renderRecentSessions(result.data);
+                }
+                
+                // Also update any Recent Training widget on the dashboard
+                document.querySelectorAll('.widget-content[data-widget-type="recent_training"]').forEach(widget => {
+                    renderRecentTrainingSessions(widget, result.data, result.date_range);
+                });
+            } else {
+                console.error('Failed to load recent sessions:', result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading recent sessions:', error);
+        });
+}
+
+/**
+ * Load all dashboard widget data
+ */
+function loadWidgetData() {
+    // Find all widgets on the dashboard
+    const widgets = document.querySelectorAll('.widget-content');
+    
+    widgets.forEach(widget => {
+        const widgetType = widget.getAttribute('data-widget-type');
+        if (widgetType) {
+            // Refresh the specific widget data based on its type
+            if (widgetType === 'recent_daily') {
+                loadRecentMetrics();
+            } else if (widgetType === 'recent_training') {
+                loadRecentSessions();
+            }
+            // Add other widget types if needed
+        }
+    });
+}
+
+/**
  * Render sleep statistics widget
  * @param {HTMLElement} element Widget element
  * @param {Object} data Sleep statistics data
@@ -709,6 +791,9 @@ function renderRecentDailyMetrics(element, data, dateRange) {
                     <a href="daily.php?date=${metric.date}" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-eye"></i>
                     </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-metric" data-id="${metric.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             </tr>
         `;
@@ -724,6 +809,18 @@ function renderRecentDailyMetrics(element, data, dateRange) {
     `;
     
     element.innerHTML = html;
+
+    // Add event listeners for delete buttons
+    document.querySelectorAll('.delete-metric').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            const metricId = this.getAttribute('data-id');
+            
+            if (confirm('Are you sure you want to delete this daily metrics entry? This action cannot be undone.')) {
+                deleteMetricsEntry(metricId);
+            }
+        });
+    });
 }
 
 /**
@@ -774,10 +871,15 @@ function renderRecentTrainingSessions(element, data, dateRange) {
                 <td>${session.session_number || 'N/A'}</td>
                 <td>${durationHtml}</td>
                 <td>${session.exercise_count || '0'}</td>
-                <td>
-                    <a href="training.php?id=${session.id}" class="btn btn-sm btn-outline-success">
-                        <i class="fas fa-eye"></i>
-                    </a>
+                <td class="text-end">
+                    <div class="d-flex justify-content-end">
+                        <a href="training.php?id=${session.id}" class="btn btn-sm btn-outline-success me-1">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-session" data-id="${session.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -793,6 +895,17 @@ function renderRecentTrainingSessions(element, data, dateRange) {
     `;
     
     element.innerHTML = html;
+
+    // Add event listeners for delete buttons
+    element.querySelectorAll('.delete-session').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            const sessionId = this.getAttribute('data-id');
+            
+            // Pass session ID directly to deleteTrainingSession without showing confirmation dialog here
+            deleteTrainingSession(sessionId, true); // Added true parameter to indicate we need confirmation
+        });
+    });
 }
 
 /**
@@ -1450,3 +1563,328 @@ document.head.insertAdjacentHTML('beforeend', `
     }
 </style>
 `);
+
+/**
+ * Renders recent daily metrics entries
+ * @param {Array} metrics The metrics data
+ */
+function renderRecentMetrics(metrics) {
+    const container = document.getElementById('recentMetricsContainer');
+    if (!container) return;
+    
+    if (!metrics || metrics.length === 0) {
+        container.innerHTML = '<p class="text-muted">No daily metrics entries found.</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    
+    metrics.forEach(metric => {
+        const date = new Date(metric.date);
+        const formattedDate = date.toLocaleDateString();
+        
+        html += `
+        <div class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">${formattedDate}</h5>
+                <div class="d-flex">
+                    <a href="daily_metrics.php?id=${metric.id}" class="btn btn-sm btn-outline-primary me-1">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-metric" data-id="${metric.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between metrics-summary">
+                <span title="Weight"><i class="fas fa-weight"></i> ${metric.weight || '-'} ${metric.weight_unit || 'kg'}</span>
+                <span title="Sleep Quality"><i class="fas fa-bed"></i> ${metric.sleep_quality || '-'}/10</span>
+                <span title="Energy Level"><i class="fas fa-bolt"></i> ${metric.energy_level || '-'}/10</span>
+                <span title="Stress Level"><i class="fas fa-brain"></i> ${metric.stress_level || '-'}/10</span>
+            </div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Add event listeners for delete buttons
+    document.querySelectorAll('.delete-metric').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            const metricId = this.getAttribute('data-id');
+            
+            if (confirm('Are you sure you want to delete this daily metrics entry? This action cannot be undone.')) {
+                deleteMetricsEntry(metricId);
+            }
+        });
+    });
+}
+
+/**
+ * Renders recent training sessions
+ * @param {Array} sessions The training sessions data
+ */
+function renderRecentSessions(sessions) {
+    const container = document.getElementById('recentSessionsContainer');
+    if (!container) return;
+    
+    if (!sessions || sessions.length === 0) {
+        container.innerHTML = '<p class="text-muted">No training sessions found.</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    
+    sessions.forEach(session => {
+        const date = new Date(session.date);
+        const formattedDate = date.toLocaleDateString();
+        
+        html += `
+        <div class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">${session.name || 'Training Session'}</h5>
+                <div class="d-flex">
+                    <a href="training.php?id=${session.id}" class="btn btn-sm btn-outline-primary me-1">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-session" data-id="${session.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="mb-1">
+                <span title="Date"><i class="far fa-calendar-alt"></i> ${formattedDate}</span>
+                ${session.duration ? `<span title="Duration" class="ms-3"><i class="far fa-clock"></i> ${session.duration} min</span>` : ''}
+                ${session.rpe ? `<span title="RPE" class="ms-3"><i class="fas fa-tachometer-alt"></i> RPE: ${session.rpe}/10</span>` : ''}
+            </p>
+        </div>`;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Add event listeners for delete buttons
+    document.querySelectorAll('.delete-session').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            const sessionId = this.getAttribute('data-id');
+            
+            // Pass session ID directly to deleteTrainingSession without showing confirmation dialog here
+            deleteTrainingSession(sessionId, true); // Added true parameter to indicate we need confirmation
+        });
+    });
+}
+
+/**
+ * Delete a daily metrics entry
+ * @param {string} metricId - The ID of the daily metrics entry to delete
+ */
+function deleteMetricsEntry(metricId) {
+    fetch('api/daily_metrics.php', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: metricId })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Show success message
+            showNotification('success', 'Daily metrics entry deleted successfully.');
+            
+            // Find and remove the deleted metrics item from the DOM for immediate visual feedback
+            const metricItems = document.querySelectorAll(`.delete-metric[data-id="${metricId}"]`);
+            metricItems.forEach(btn => {
+                const item = btn.closest('.list-group-item');
+                if (item) {
+                    item.remove();
+                }
+                
+                // Also remove row from table if it exists
+                const tableRow = btn.closest('tr');
+                if (tableRow) {
+                    tableRow.remove();
+                }
+            });
+            
+            // Check if there are any metrics left in the widget and update UI accordingly
+            const recentMetricsContainer = document.getElementById('recentMetricsContainer');
+            const listItems = recentMetricsContainer?.querySelectorAll('.list-group-item');
+            const tableRows = document.querySelector('.widget-content[data-widget-type="recent_daily"] tbody')?.querySelectorAll('tr');
+            
+            // If no more metrics entries in list view
+            if (recentMetricsContainer && listItems && listItems.length === 0) {
+                recentMetricsContainer.innerHTML = '<p class="text-muted">No daily metrics entries found.</p>';
+            }
+            
+            // If no more metrics entries in table view
+            if (tableRows && tableRows.length === 0) {
+                const widgetElement = document.querySelector('.widget-content[data-widget-type="recent_daily"]');
+                if (widgetElement) {
+                    widgetElement.innerHTML = `
+                        <div class="text-center py-3">
+                            <i class="fas fa-calendar-day fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">No daily metrics available for this period.</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Refresh all dashboard widgets since metrics data affects multiple widgets
+            refreshAllDashboardWidgets();
+        } else {
+            showNotification('danger', result.message || 'Failed to delete metrics entry.');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting metrics entry:', error);
+        showNotification('danger', 'An error occurred while deleting the metrics entry.');
+    });
+}
+
+/**
+ * Delete a training session
+ * @param {string} sessionId - The ID of the training session to delete
+ * @param {boolean} needsConfirmation - Whether confirmation is needed before deletion
+ */
+function deleteTrainingSession(sessionId, needsConfirmation = false) {
+    // Show confirmation dialog only if needed (first time)
+    if (needsConfirmation) {
+        if (!confirm('Are you sure you want to delete this training session? This will also delete all exercises in this session. This action cannot be undone.')) {
+            return; // User cancelled, abort deletion
+        }
+    }
+    
+    fetch('api/training_sessions.php', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: sessionId })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Show success message
+            showNotification('success', 'Training session deleted successfully.');
+            
+            // Find and remove the deleted session item from the DOM for immediate visual feedback
+            const sessionItems = document.querySelectorAll(`.delete-session[data-id="${sessionId}"]`);
+            sessionItems.forEach(btn => {
+                const item = btn.closest('.list-group-item');
+                if (item) {
+                    item.remove();
+                }
+                
+                // Also remove row from table if it exists
+                const tableRow = btn.closest('tr');
+                if (tableRow) {
+                    tableRow.remove();
+                }
+            });
+            
+            // Refresh all dashboard widgets since training data affects multiple widgets
+            refreshAllDashboardWidgets();
+        } else {
+            showNotification('danger', result.message || 'Failed to delete training session.');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting training session:', error);
+        showNotification('danger', 'An error occurred while deleting the training session.');
+    });
+}
+
+/**
+ * Refresh all dashboard widgets with current data
+ * This ensures all widgets stay in sync when data is deleted
+ */
+function refreshAllDashboardWidgets() {
+    // Find all widgets on the dashboard
+    const widgets = document.querySelectorAll('.widget-content');
+    if (widgets.length === 0) return;
+    
+    // Get the current date range from active view selector
+    const activeViewSelector = document.querySelector('.view-selector.active');
+    let view = 'weekly'; // Default view
+    
+    if (activeViewSelector) {
+        view = activeViewSelector.getAttribute('data-view');
+    }
+    
+    // Calculate date range based on view
+    const endDate = new Date();
+    let startDate = new Date();
+    
+    switch (view) {
+        case 'weekly':
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+        case 'monthly':
+            startDate.setDate(startDate.getDate() - 30);
+            break;
+        case 'daily':
+        default:
+            startDate.setDate(startDate.getDate() - 1);
+            break;
+    }
+    
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+    
+    // Show loading state for all widgets
+    widgets.forEach(widget => {
+        widget.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center h-100">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    // Reload content for each widget
+    widgets.forEach(widget => {
+        const widgetType = widget.getAttribute('data-widget-type');
+        const widgetId = widget.closest('.card').id.replace('widget-', '');
+        
+        if (widgetType) {
+            loadWidgetContent(widgetId, widgetType, startDateString, endDateString);
+        }
+    });
+    
+    // Also update the standalone sections if they exist
+    if (document.getElementById('recentMetricsContainer')) {
+        loadRecentMetrics();
+    }
+    
+    if (document.getElementById('recentSessionsContainer')) {
+        loadRecentSessions();
+    }
+}
+
+/**
+ * Show a notification message
+ * @param {string} type - The type of notification (success, danger, warning, info)
+ * @param {string} message - The message to display
+ */
+function showNotification(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Insert at the top of the main container
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertDiv.remove(), 150);
+    }, 3000);
+}
