@@ -19,45 +19,31 @@ header('Content-Type: application/json');
 // Check request method
 $method = $_SERVER['REQUEST_METHOD'];
 
+if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'recent') {
+    // Get recent training sessions with exercise count
+    $db = new Database();
+    $db->query("SELECT ts.*, 
+                (SELECT COUNT(*) FROM workout_details wd WHERE wd.session_id = ts.id) as exercise_count
+                FROM training_sessions ts 
+                WHERE ts.user_id = :user_id 
+                ORDER BY ts.date DESC, ts.id DESC
+                LIMIT 10");
+    $db->bind(':user_id', $userId);
+    $sessions = $db->resultSet();
+    
+    echo json_encode(['success' => true, 'data' => $sessions]);
+    exit;
+}
+
 switch ($method) {
     case 'GET':
-        // Get training sessions (either single day, specific session, or date range)
-        if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-            // Get specific session by ID
-            $db = new Database();
-            $db->query("SELECT * FROM training_sessions WHERE id = :id AND user_id = :user_id");
-            $db->bind(':id', $_GET['id']);
-            $db->bind(':user_id', $userId); // Security: Only get data for current user
-            $session = $db->single();
-            
-            if ($session) {
-                echo json_encode(['success' => true, 'data' => $session]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Training session not found']);
-            }
-        } elseif (isset($_GET['date']) && validateDate($_GET['date'])) {
-            // Get all sessions for a specific date (filtered for current user)
-            $db = new Database();
-            $db->query("SELECT * FROM training_sessions WHERE date = :date AND user_id = :user_id");
-            $db->bind(':date', $_GET['date']);
-            $db->bind(':user_id', $userId); // Security: Only get data for current user
-            $sessions = $db->resultSet();
-            
-            echo json_encode(['success' => true, 'data' => $sessions]);
-        } elseif (isset($_GET['start_date']) && isset($_GET['end_date']) && 
-                validateDate($_GET['start_date']) && validateDate($_GET['end_date'])) {
-            // Get all sessions within a date range (filtered for current user)
-            $db = new Database();
-            $db->query("SELECT * FROM training_sessions WHERE date BETWEEN :start_date AND :end_date AND user_id = :user_id ORDER BY date DESC");
-            $db->bind(':start_date', $_GET['start_date']);
-            $db->bind(':end_date', $_GET['end_date']);
-            $db->bind(':user_id', $userId); // Security: Only get data for current user
-            $sessions = $db->resultSet();
-            
-            echo json_encode(['success' => true, 'data' => $sessions]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
-        }
+        // Get all training sessions for the user
+        $db = new Database();
+        $db->query("SELECT * FROM training_sessions WHERE user_id = :user_id ORDER BY date DESC, id DESC");
+        $db->bind(':user_id', $userId);
+        $sessions = $db->resultSet();
+        
+        echo json_encode(['success' => true, 'data' => $sessions]);
         break;
         
     case 'POST':
@@ -72,13 +58,26 @@ switch ($method) {
         
         // Process and sanitize data
         $processedData = [
-            'user_id' => $userId, // Always use the current user's ID
+            'user_id' => $userId,
             'date' => sanitize($data['date']),
             'mesocycle_name' => isset($data['mesocycle_name']) ? sanitize($data['mesocycle_name']) : null,
-            'session_number' => isset($data['session_number']) ? (int)sanitize($data['session_number']) : null,
-            'training_start' => isset($data['training_start']) ? sanitize($data['training_start']) : null,
-            'training_end' => isset($data['training_end']) ? sanitize($data['training_end']) : null
+            'session_number' => isset($data['session_number']) && is_numeric($data['session_number']) ? (int)sanitize($data['session_number']) : null,
+            'training_start' => null,
+            'training_end' => null
         ];
+        
+        // Process training times
+        if (isset($data['training_start']) && !empty($data['training_start'])) {
+            $processedData['training_start'] = sanitize($data['training_start']);
+        } else if (isset($data['training_start_time']) && !empty($data['training_start_time'])) {
+            $processedData['training_start'] = $processedData['date'] . ' ' . sanitize($data['training_start_time']) . ':00';
+        }
+        
+        if (isset($data['training_end']) && !empty($data['training_end'])) {
+            $processedData['training_end'] = sanitize($data['training_end']);
+        } else if (isset($data['training_end_time']) && !empty($data['training_end_time'])) {
+            $processedData['training_end'] = $processedData['date'] . ' ' . sanitize($data['training_end_time']) . ':00';
+        }
         
         // Create training session
         $sessionId = createTrainingSession($processedData);
@@ -96,7 +95,7 @@ switch ($method) {
         
         // Validate required fields
         if (!isset($data['id']) || !is_numeric($data['id'])) {
-            echo json_encode(['success' => false, 'message' => 'Valid session ID is required']);
+            echo json_encode(['success' => false, 'message' => 'Valid training session ID is required']);
             exit;
         }
         
@@ -105,13 +104,14 @@ switch ($method) {
             exit;
         }
         
-        // Security check: Verify ownership of the session
+        // Security check: Verify ownership
         $db = new Database();
-        $db->query("SELECT user_id FROM training_sessions WHERE id = :id");
+        $db->query("SELECT id FROM training_sessions WHERE id = :id AND user_id = :user_id");
         $db->bind(':id', $data['id']);
-        $existingSession = $db->single();
+        $db->bind(':user_id', $userId);
+        $session = $db->single();
         
-        if (!$existingSession || $existingSession['user_id'] != $userId) {
+        if (!$session) {
             echo json_encode(['success' => false, 'message' => 'You do not have permission to modify this training session']);
             exit;
         }
@@ -119,13 +119,26 @@ switch ($method) {
         // Process and sanitize data
         $processedData = [
             'id' => (int)sanitize($data['id']),
-            'user_id' => $userId, // Always use the current user's ID
+            'user_id' => $userId,
             'date' => sanitize($data['date']),
             'mesocycle_name' => isset($data['mesocycle_name']) ? sanitize($data['mesocycle_name']) : null,
-            'session_number' => isset($data['session_number']) ? (int)sanitize($data['session_number']) : null,
-            'training_start' => isset($data['training_start']) ? sanitize($data['training_start']) : null,
-            'training_end' => isset($data['training_end']) ? sanitize($data['training_end']) : null
+            'session_number' => isset($data['session_number']) && is_numeric($data['session_number']) ? (int)sanitize($data['session_number']) : null,
+            'training_start' => null,
+            'training_end' => null
         ];
+        
+        // Process training times
+        if (isset($data['training_start']) && !empty($data['training_start'])) {
+            $processedData['training_start'] = sanitize($data['training_start']);
+        } else if (isset($data['training_start_time']) && !empty($data['training_start_time'])) {
+            $processedData['training_start'] = $processedData['date'] . ' ' . sanitize($data['training_start_time']) . ':00';
+        }
+        
+        if (isset($data['training_end']) && !empty($data['training_end'])) {
+            $processedData['training_end'] = sanitize($data['training_end']);
+        } else if (isset($data['training_end_time']) && !empty($data['training_end_time'])) {
+            $processedData['training_end'] = $processedData['date'] . ' ' . sanitize($data['training_end_time']) . ':00';
+        }
         
         // Update training session
         if (updateTrainingSession($processedData)) {
@@ -140,17 +153,18 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!isset($data['id']) || !is_numeric($data['id'])) {
-            echo json_encode(['success' => false, 'message' => 'Valid session ID is required']);
+            echo json_encode(['success' => false, 'message' => 'Valid training session ID is required']);
             exit;
         }
         
-        // Security check: Verify ownership of the session
+        // Security check: Verify ownership
         $db = new Database();
-        $db->query("SELECT user_id FROM training_sessions WHERE id = :id");
+        $db->query("SELECT id FROM training_sessions WHERE id = :id AND user_id = :user_id");
         $db->bind(':id', $data['id']);
-        $existingSession = $db->single();
+        $db->bind(':user_id', $userId);
+        $session = $db->single();
         
-        if (!$existingSession || $existingSession['user_id'] != $userId) {
+        if (!$session) {
             echo json_encode(['success' => false, 'message' => 'You do not have permission to delete this training session']);
             exit;
         }
