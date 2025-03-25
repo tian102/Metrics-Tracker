@@ -16,37 +16,57 @@ $userId = $_SESSION['user_id'];
 // Set headers for JSON response
 header('Content-Type: application/json');
 
-// Check request method
-$method = $_SERVER['REQUEST_METHOD'];
+// Check action parameter
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 switch ($action) {
     case 'get_records':
-        // Get personal records
-        getPersonalRecords($userId);
+        // Get all personal records for the current user
+        $records = getPersonalRecords($userId);
+        echo json_encode(['success' => true, 'data' => $records]);
+        break;
+        
+    case 'get_exercise_records':
+        // Get personal records for a specific exercise
+        if (!isset($_GET['exercise_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Exercise ID is required']);
+            exit;
+        }
+        
+        $exerciseId = (int)$_GET['exercise_id'];
+        $records = getExercisePersonalRecords($userId, $exerciseId);
+        echo json_encode(['success' => true, 'data' => $records]);
         break;
         
     case 'acknowledge':
-        // Mark a PR as acknowledged
-        if ($method !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Invalid request method']);
-            break;
-        }
-        acknowledgeRecord($userId);
-        break;
+        // Handle post data for acknowledging a personal record
+        $data = json_decode(file_get_contents('php://input'), true);
         
-    case 'check_workout':
-        // Check a workout for new PRs
-        if ($method !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Invalid request method']);
-            break;
+        if (!isset($data['record_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Record ID is required']);
+            exit;
         }
-        checkWorkoutForPRs($userId);
-        break;
         
+        $recordId = (int)$data['record_id'];
+        $result = acknowledgePersonalRecord($userId, $recordId);
+        
+        echo json_encode($result);
+        break;
+    
     case 'unacknowledged':
-        // Get count of unacknowledged PRs
-        getUnacknowledgedCount($userId);
+        // Get count of unacknowledged personal records
+        $count = getUnacknowledgedRecordsCount($userId);
+        echo json_encode(['success' => true, 'count' => $count]);
+        break;
+        
+    case 'regenerate_records':
+        // This is an admin action to regenerate all personal records from workout history
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $result = regeneratePersonalRecords($userId);
+            echo json_encode($result);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+        }
         break;
         
     default:
@@ -57,274 +77,238 @@ switch ($action) {
 /**
  * Get all personal records for a user
  * @param int $userId User ID
+ * @return array Personal records
  */
 function getPersonalRecords($userId) {
     $db = new Database();
     
-    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
-    if ($limit < 1 || $limit > 100) {
-        $limit = 10;
-    }
-    
-    // Get personal records
-    $db->query("SELECT pr.*, e.name AS exercise_name, e.muscle_group_id,
-                m.name AS muscle_group, eq.name AS equipment
+    $db->query("SELECT pr.*, 
+                e.name as exercise_name, 
+                mg.name as muscle_group, 
+                eq.name as equipment
                 FROM personal_records pr
                 JOIN exercises e ON pr.exercise_id = e.id
-                JOIN muscle_groups m ON e.muscle_group_id = m.id
+                JOIN muscle_groups mg ON e.muscle_group_id = mg.id
                 JOIN equipment eq ON e.equipment_id = eq.id
-                WHERE pr.user_id = :user_id 
-                ORDER BY pr.date DESC, pr.created_at DESC
-                LIMIT :limit");
+                WHERE pr.user_id = :user_id
+                ORDER BY pr.date DESC, pr.is_acknowledged ASC");
     
     $db->bind(':user_id', $userId);
-    $db->bind(':limit', $limit);
-    
-    $records = $db->resultSet();
-    
-    echo json_encode(['success' => true, 'data' => $records]);
+    return $db->resultSet();
 }
 
 /**
- * Mark a PR as acknowledged
+ * Get personal records for a specific exercise
  * @param int $userId User ID
+ * @param int $exerciseId Exercise ID
+ * @return array Personal records for the exercise
  */
-function acknowledgeRecord($userId) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    if (!isset($data['record_id'])) {
-        echo json_encode(['success' => false, 'message' => 'Record ID is required']);
-        return;
-    }
-    
-    $recordId = (int)$data['record_id'];
-    
+function getExercisePersonalRecords($userId, $exerciseId) {
     $db = new Database();
     
-    // Ensure the record belongs to the user
+    $db->query("SELECT pr.*, 
+                e.name as exercise_name, 
+                mg.name as muscle_group, 
+                eq.name as equipment
+                FROM personal_records pr
+                JOIN exercises e ON pr.exercise_id = e.id
+                JOIN muscle_groups mg ON e.muscle_group_id = mg.id
+                JOIN equipment eq ON e.equipment_id = eq.id
+                WHERE pr.user_id = :user_id AND e.id = :exercise_id
+                ORDER BY pr.date DESC, pr.is_acknowledged ASC");
+    
+    $db->bind(':user_id', $userId);
+    $db->bind(':exercise_id', $exerciseId);
+    return $db->resultSet();
+}
+
+/**
+ * Acknowledge a personal record
+ * @param int $userId User ID
+ * @param int $recordId Record ID
+ * @return array Result with success status and message
+ */
+function acknowledgePersonalRecord($userId, $recordId) {
+    $db = new Database();
+    
+    // Verify the record belongs to the user
     $db->query("SELECT id FROM personal_records WHERE id = :id AND user_id = :user_id");
     $db->bind(':id', $recordId);
     $db->bind(':user_id', $userId);
-    
     $record = $db->single();
     
     if (!$record) {
-        echo json_encode(['success' => false, 'message' => 'Record not found or access denied']);
-        return;
+        return ['success' => false, 'message' => 'Record not found or not authorized'];
     }
     
-    // Update the record
+    // Update the record to acknowledged
     $db->query("UPDATE personal_records SET is_acknowledged = 1 WHERE id = :id");
     $db->bind(':id', $recordId);
     
     if ($db->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Record acknowledged']);
+        return ['success' => true, 'message' => 'Record acknowledged successfully'];
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to acknowledge record']);
+        return ['success' => false, 'message' => 'Failed to acknowledge record'];
     }
-}
-
-/**
- * Check a workout for new personal records
- * @param int $userId User ID
- */
-function checkWorkoutForPRs($userId) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    if (!isset($data['workout_id'])) {
-        echo json_encode(['success' => false, 'message' => 'Workout ID is required']);
-        return;
-    }
-    
-    $workoutId = (int)$data['workout_id'];
-    
-    $db = new Database();
-    
-    // Get the workout details
-    $db->query("SELECT w.*, t.date, t.user_id, e.id AS exercise_id, e.name AS exercise_name
-                FROM workout_details w
-                JOIN training_sessions t ON w.session_id = t.id
-                JOIN exercises e ON w.exercise_name = e.name
-                WHERE w.id = :id AND t.user_id = :user_id");
-    
-    $db->bind(':id', $workoutId);
-    $db->bind(':user_id', $userId);
-    
-    $workout = $db->single();
-    
-    if (!$workout) {
-        echo json_encode(['success' => false, 'message' => 'Workout not found or access denied']);
-        return;
-    }
-    
-    // Check for PRs
-    $prs = [];
-    
-    // Check for weight PR (1RM)
-    $db->query("SELECT MAX(pr.record_value) AS max_weight
-                FROM personal_records pr
-                WHERE pr.user_id = :user_id 
-                AND pr.exercise_id = :exercise_id
-                AND pr.record_type = 'weight'");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':exercise_id', $workout['exercise_id']);
-    
-    $maxWeightRecord = $db->single();
-    $currentMaxWeight = $maxWeightRecord ? $maxWeightRecord['max_weight'] : 0;
-    
-    if ($workout['load_weight'] > $currentMaxWeight) {
-        // This is a new weight PR
-        $pr = createPersonalRecord(
-            $userId,
-            $workout['exercise_id'],
-            $workout['load_weight'],
-            'weight',
-            $workout['date'],
-            $workoutId
-        );
-        
-        if ($pr) {
-            $prs[] = [
-                'id' => $pr,
-                'type' => 'weight',
-                'value' => $workout['load_weight'],
-                'exercise' => $workout['exercise_name']
-            ];
-        }
-    }
-    
-    // Check for volume PR (sets * reps * weight)
-    $volume = $workout['sets'] * $workout['reps'] * $workout['load_weight'];
-    
-    $db->query("SELECT MAX(pr.record_value) AS max_volume
-                FROM personal_records pr
-                WHERE pr.user_id = :user_id 
-                AND pr.exercise_id = :exercise_id
-                AND pr.record_type = 'volume'");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':exercise_id', $workout['exercise_id']);
-    
-    $maxVolumeRecord = $db->single();
-    $currentMaxVolume = $maxVolumeRecord ? $maxVolumeRecord['max_volume'] : 0;
-    
-    if ($volume > $currentMaxVolume) {
-        // This is a new volume PR
-        $pr = createPersonalRecord(
-            $userId,
-            $workout['exercise_id'],
-            $volume,
-            'volume',
-            $workout['date'],
-            $workoutId
-        );
-        
-        if ($pr) {
-            $prs[] = [
-                'id' => $pr,
-                'type' => 'volume',
-                'value' => $volume,
-                'exercise' => $workout['exercise_name']
-            ];
-        }
-    }
-    
-    // Check for reps PR (at this weight or higher)
-    $db->query("SELECT MAX(pr.record_value) AS max_reps
-                FROM personal_records pr
-                JOIN workout_details w ON pr.workout_detail_id = w.id
-                WHERE pr.user_id = :user_id 
-                AND pr.exercise_id = :exercise_id
-                AND pr.record_type = 'reps'
-                AND w.load_weight >= :load_weight");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':exercise_id', $workout['exercise_id']);
-    $db->bind(':load_weight', $workout['load_weight']);
-    
-    $maxRepsRecord = $db->single();
-    $currentMaxReps = $maxRepsRecord ? $maxRepsRecord['max_reps'] : 0;
-    
-    if ($workout['reps'] > $currentMaxReps && $workout['load_weight'] > 0) {
-        // This is a new reps PR at this weight
-        $pr = createPersonalRecord(
-            $userId,
-            $workout['exercise_id'],
-            $workout['reps'],
-            'reps',
-            $workout['date'],
-            $workoutId
-        );
-        
-        if ($pr) {
-            $prs[] = [
-                'id' => $pr,
-                'type' => 'reps',
-                'value' => $workout['reps'],
-                'weight' => $workout['load_weight'],
-                'exercise' => $workout['exercise_name']
-            ];
-        }
-    }
-    
-    echo json_encode([
-        'success' => true,
-        'message' => count($prs) > 0 ? 'New personal records found!' : 'No new personal records.',
-        'records' => $prs
-    ]);
 }
 
 /**
  * Get count of unacknowledged personal records
  * @param int $userId User ID
+ * @return int Count of unacknowledged records
  */
-function getUnacknowledgedCount($userId) {
+function getUnacknowledgedRecordsCount($userId) {
     $db = new Database();
     
-    $db->query("SELECT COUNT(*) AS count
-                FROM personal_records
-                WHERE user_id = :user_id AND is_acknowledged = 0");
-    
+    $db->query("SELECT COUNT(*) as count FROM personal_records 
+               WHERE user_id = :user_id AND is_acknowledged = 0");
     $db->bind(':user_id', $userId);
-    
     $result = $db->single();
-    $count = $result ? $result['count'] : 0;
     
-    echo json_encode([
-        'success' => true,
-        'count' => $count
-    ]);
+    return $result ? (int)$result['count'] : 0;
 }
 
 /**
- * Create a new personal record
+ * Regenerate all personal records from workout history
+ * This can be used if records weren't properly generated before
  * @param int $userId User ID
- * @param int $exerciseId Exercise ID
- * @param float $recordValue Record value
- * @param string $recordType Record type (weight, reps, volume, time)
- * @param string $date Date of the record
- * @param int $workoutDetailId Workout detail ID
- * @return int|bool New record ID or false on failure
+ * @return array Result with success status and message
  */
-function createPersonalRecord($userId, $exerciseId, $recordValue, $recordType, $date, $workoutDetailId) {
+function regeneratePersonalRecords($userId) {
     $db = new Database();
     
-    $db->query("INSERT INTO personal_records 
-               (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged) 
-               VALUES 
-               (:user_id, :exercise_id, :record_value, :record_type, :date, :workout_detail_id, 0)");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':exercise_id', $exerciseId);
-    $db->bind(':record_value', $recordValue);
-    $db->bind(':record_type', $recordType);
-    $db->bind(':date', $date);
-    $db->bind(':workout_detail_id', $workoutDetailId);
-    
-    if ($db->execute()) {
-        return $db->lastInsertId();
+    try {
+        // Begin transaction
+        $db->beginTransaction();
+        
+        // Delete existing personal records for this user
+        $db->query("DELETE FROM personal_records WHERE user_id = :user_id");
+        $db->bind(':user_id', $userId);
+        $db->execute();
+        
+        // Get all workout details for this user with explicit collation specified to fix the mismatch
+        $db->query("SELECT wd.*, e.id as exercise_id, ts.date 
+                  FROM workout_details wd
+                  JOIN training_sessions ts ON wd.session_id = ts.id
+                  JOIN exercises e ON CAST(wd.exercise_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci = e.name
+                  WHERE ts.user_id = :user_id
+                  ORDER BY ts.date ASC");
+        $db->bind(':user_id', $userId);
+        $workouts = $db->resultSet();
+        
+        $generated = 0;
+        $exercises = [];
+        
+        // Track best records per exercise
+        foreach ($workouts as $workout) {
+            if (empty($workout['sets']) || empty($workout['reps']) || empty($workout['load_weight'])) {
+                continue; // Skip incomplete workouts
+            }
+            
+            $exerciseId = $workout['exercise_id'];
+            
+            // Initialize exercise records if not set
+            if (!isset($exercises[$exerciseId])) {
+                $exercises[$exerciseId] = [
+                    'best_weight' => 0,
+                    'best_weight_date' => null,
+                    'best_weight_workout_id' => null,
+                    'best_reps' => 0,
+                    'best_reps_date' => null,
+                    'best_reps_workout_id' => null,
+                    'best_volume' => 0,
+                    'best_volume_date' => null,
+                    'best_volume_workout_id' => null
+                ];
+            }
+            
+            // Check for weight PR
+            $weight = floatval($workout['load_weight']);
+            if ($weight > $exercises[$exerciseId]['best_weight']) {
+                $exercises[$exerciseId]['best_weight'] = $weight;
+                $exercises[$exerciseId]['best_weight_date'] = $workout['date'];
+                $exercises[$exerciseId]['best_weight_workout_id'] = $workout['id'];
+            }
+            
+            // Check for reps PR
+            $reps = intval($workout['reps']);
+            if ($reps > $exercises[$exerciseId]['best_reps']) {
+                $exercises[$exerciseId]['best_reps'] = $reps;
+                $exercises[$exerciseId]['best_reps_date'] = $workout['date'];
+                $exercises[$exerciseId]['best_reps_workout_id'] = $workout['id'];
+            }
+            
+            // Check for volume PR
+            $volume = floatval($workout['sets']) * floatval($workout['reps']) * floatval($workout['load_weight']);
+            if ($volume > $exercises[$exerciseId]['best_volume']) {
+                $exercises[$exerciseId]['best_volume'] = $volume;
+                $exercises[$exerciseId]['best_volume_date'] = $workout['date'];
+                $exercises[$exerciseId]['best_volume_workout_id'] = $workout['id'];
+            }
+        }
+        
+        // After processing all workouts, insert only the latest PRs for each exercise/type
+        foreach ($exercises as $exerciseId => $records) {
+            // Insert weight PR
+            if ($records['best_weight'] > 0) {
+                $db->query("INSERT INTO personal_records 
+                          (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                          VALUES 
+                          (:user_id, :exercise_id, :record_value, 'weight', :date, :workout_detail_id, 1, NOW())");
+                
+                $db->bind(':user_id', $userId);
+                $db->bind(':exercise_id', $exerciseId);
+                $db->bind(':record_value', $records['best_weight']);
+                $db->bind(':date', $records['best_weight_date']);
+                $db->bind(':workout_detail_id', $records['best_weight_workout_id']);
+                $db->execute();
+                $generated++;
+            }
+            
+            // Insert reps PR
+            if ($records['best_reps'] > 0) {
+                $db->query("INSERT INTO personal_records 
+                          (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                          VALUES 
+                          (:user_id, :exercise_id, :record_value, 'reps', :date, :workout_detail_id, 1, NOW())");
+                
+                $db->bind(':user_id', $userId);
+                $db->bind(':exercise_id', $exerciseId);
+                $db->bind(':record_value', $records['best_reps']);
+                $db->bind(':date', $records['best_reps_date']);
+                $db->bind(':workout_detail_id', $records['best_reps_workout_id']);
+                $db->execute();
+                $generated++;
+            }
+            
+            // Insert volume PR
+            if ($records['best_volume'] > 0) {
+                $db->query("INSERT INTO personal_records 
+                          (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                          VALUES 
+                          (:user_id, :exercise_id, :record_value, 'volume', :date, :workout_detail_id, 1, NOW())");
+                
+                $db->bind(':user_id', $userId);
+                $db->bind(':exercise_id', $exerciseId);
+                $db->bind(':record_value', $records['best_volume']);
+                $db->bind(':date', $records['best_volume_date']);
+                $db->bind(':workout_detail_id', $records['best_volume_workout_id']);
+                $db->execute();
+                $generated++;
+            }
+        }
+        
+        // Commit transaction
+        $db->commit();
+        
+        return [
+            'success' => true, 
+            'message' => "Successfully regenerated $generated personal records", 
+            'records_generated' => $generated
+        ];
+    } catch (Exception $e) {
+        // Rollback on error
+        $db->rollBack();
+        return ['success' => false, 'message' => 'Error regenerating personal records: ' . $e->getMessage()];
     }
-    
-    return false;
 }

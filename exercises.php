@@ -90,7 +90,33 @@ $userId = $_SESSION['user_id'];
             </div>
         </div>
         
-        <div class="card shadow-sm">
+        <!-- Move Personal Records Card here (between Exercise Library and Library Stats) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Personal Records</h3>
+            </div>
+            <div class="card-body">
+                <!-- Loading spinner for PRs -->
+                <div id="prLoadingSpinner" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading personal records...</p>
+                </div>
+                
+                <!-- PR content -->
+                <div id="personalRecords">
+                    <!-- PRs will be loaded here -->
+                </div>
+                
+                <!-- Error message for PRs -->
+                <div id="prErrorMessage" class="alert alert-danger" style="display: none;">
+                    Failed to load personal records
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h3 class="mb-0">Library Stats</h3>
             </div>
@@ -111,6 +137,24 @@ $userId = $_SESSION['user_id'];
                 <!-- Error message for stats -->
                 <div id="statsErrorMessage" class="alert alert-danger" style="display: none;">
                     Failed to load library stats
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add a button to regenerate personal records for debugging/admin purposes -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="mb-0">Actions</h3>
+                    </div>
+                    <div class="card-body">
+                        <button id="regeneratePRsBtn" class="btn btn-warning">
+                            <i class="fas fa-sync-alt"></i> Regenerate Personal Records
+                        </button>
+                        <small class="text-muted ms-3">Use this if your personal records aren't showing up correctly.</small>
+                        <div id="regenerateResult" class="mt-2"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -214,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadFilterOptions();
     loadLibraryStats();
     searchExercises();
+    loadPersonalRecords();
 
     // Setup event listeners
     setupEventListeners();
@@ -661,30 +706,287 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    // Function to load personal records
+    function loadPersonalRecords() {
+        const prContainer = document.getElementById('personalRecords');
+        const prLoadingSpinner = document.getElementById('prLoadingSpinner');
+        const prErrorMessage = document.getElementById('prErrorMessage');
+        
+        if (prLoadingSpinner) prLoadingSpinner.style.display = 'block';
+        if (prContainer) prContainer.innerHTML = '';
+        if (prErrorMessage) prErrorMessage.style.display = 'none';
+        
+        fetch('api/personal_records.php?action=get_records')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
+                
+                if (result.success && result.data) {
+                    renderPersonalRecords(result.data);
+                } else {
+                    console.error('Failed to load personal records:', result.message);
+                    if (prErrorMessage) {
+                        prErrorMessage.textContent = result.message || 'Failed to load personal records';
+                        prErrorMessage.style.display = 'block';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading personal records:', error);
+                if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
+                if (prErrorMessage) {
+                    prErrorMessage.textContent = 'Error loading personal records. Please try again.';
+                    prErrorMessage.style.display = 'block';
+                }
+            });
+    }
+    
+    // Function to render personal records
+    function renderPersonalRecords(records) {
+        const prContainer = document.getElementById('personalRecords');
+        if (!prContainer) return;
+        
+        if (!records || records.length === 0) {
+            prContainer.innerHTML = `
+                <div class="text-center py-3">
+                    <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+                    <p class="mb-0">No personal records available yet.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Group records by exercise and record type to find latest records
+        const latestRecords = {};
+        
+        records.forEach(record => {
+            const key = `${record.exercise_id}_${record.record_type}`;
+            
+            // If we haven't seen this exercise/record type combo yet, or if this record is newer
+            if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
+                latestRecords[key] = record;
+            }
+        });
+        
+        // Convert the object of latest records back to an array
+        const latestRecordsArray = Object.values(latestRecords);
+        
+        // Group records by exercise name for display
+        const recordsByExercise = {};
+        
+        latestRecordsArray.forEach(record => {
+            if (!recordsByExercise[record.exercise_name]) {
+                recordsByExercise[record.exercise_name] = [];
+            }
+            recordsByExercise[record.exercise_name].push(record);
+        });
+        
+        let html = `
+            <div class="accordion" id="accordionPersonalRecords">
+        `;
+        
+        // Sort exercises alphabetically
+        const sortedExercises = Object.keys(recordsByExercise).sort();
+        
+        sortedExercises.forEach((exerciseName, index) => {
+            const recordsList = recordsByExercise[exerciseName];
+            const headingId = `heading${index}`;
+            const collapseId = `collapse${index}`;
+            
+            html += `
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="${headingId}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                            <strong>${exerciseName}</strong> <span class="badge bg-primary ms-2">${recordsList.length}</span>
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#accordionPersonalRecords">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Value</th>
+                                            <th>Date</th>
+                                            <th>Muscle Group</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+            `;
+            
+            // Sort records by date (newest first)
+            recordsList.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            recordsList.forEach(record => {
+                const recordType = formatRecordType(record.record_type);
+                const recordValue = formatRecordValue(record.record_value, record.record_type);
+                const dateStr = formatDate(record.date);
+                const isNew = !record.is_acknowledged;
+                
+                html += `
+                    <tr ${isNew ? 'class="table-warning"' : ''}>
+                        <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
+                        <td>${recordValue}</td>
+                        <td>${dateStr}</td>
+                        <td>${record.muscle_group}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+            </div>
+        `;
+        
+        prContainer.innerHTML = html;
+    }
+    
+    // Function to format a record type for display
+    function formatRecordType(type) {
+        switch (type) {
+            case 'weight':
+                return 'Weight PR';
+            case 'reps':
+                return 'Reps PR';
+            case 'volume':
+                return 'Volume PR';
+            case 'time':
+                return 'Time PR';
+            default:
+                return type;
+        }
+    }
+    
+    // Function to format a record value for display
+    function formatRecordValue(value, type) {
+        switch (type) {
+            case 'weight':
+                return `${value} kg`;
+            case 'reps':
+                return `${value} reps`;
+            case 'volume':
+                return `${value} kg (volume)`;
+            case 'time':
+                return `${value} seconds`;
+            default:
+                return value;
+        }
+    }
+    
+    // Function to format a date for display
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    
     // Function to view exercise details
     function viewExercise(exerciseId) {
-        fetch(`api/exercise_library.php?action=get_exercise&id=${exerciseId}`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    const exercise = result.data;
-                    
-                    const content = `
+        Promise.all([
+            fetch(`api/exercise_library.php?action=get_exercise&id=${exerciseId}`),
+            fetch(`api/personal_records.php?action=get_exercise_records&exercise_id=${exerciseId}`)
+        ])
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(([exerciseResult, recordsResult]) => {
+            if (exerciseResult.success) {
+                const exercise = exerciseResult.data;
+                
+                let content = `
+                    <div class="mb-4">
                         <p><strong>Exercise:</strong> ${exercise.name}</p>
                         <p><strong>Muscle Group:</strong> ${exercise.muscle_group}</p>
                         <p><strong>Equipment:</strong> ${exercise.equipment}</p>
                         <p><strong>Description:</strong> ${exercise.description || 'No description available'}</p>
-                    `;
+                    </div>
+                `;
+                
+                // Add personal records section if available
+                if (recordsResult.success && recordsResult.data && recordsResult.data.length > 0) {
+                    // Filter to only show latest record for each record type
+                    const latestRecords = {};
                     
-                    showModal('Exercise Details', content, 'info');
+                    recordsResult.data.forEach(record => {
+                        const key = record.record_type;
+                        
+                        if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
+                            latestRecords[key] = record;
+                        }
+                    });
+                    
+                    // Convert back to array and sort by date (newest first)
+                    const latestRecordsArray = Object.values(latestRecords);
+                    latestRecordsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    if (latestRecordsArray.length > 0) {
+                        content += `
+                            <div class="mt-4">
+                                <h5>Personal Records</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Value</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                        `;
+                        
+                        latestRecordsArray.forEach(record => {
+                            const recordType = formatRecordType(record.record_type);
+                            const recordValue = formatRecordValue(record.record_value, record.record_type);
+                            const dateStr = formatDate(record.date);
+                            const isNew = !record.is_acknowledged;
+                            
+                            content += `
+                                <tr ${isNew ? 'class="table-warning"' : ''}>
+                                    <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
+                                    <td>${recordValue}</td>
+                                    <td>${dateStr}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        content += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
                 } else {
-                    showModal('Error', result.message || 'Failed to load exercise', 'danger');
+                    content += `
+                        <div class="mt-4">
+                            <h5>Personal Records</h5>
+                            <p class="text-muted">No personal records available for this exercise.</p>
+                        </div>
+                    `;
                 }
-            })
-            .catch(error => {
-                console.error('Error viewing exercise:', error);
-                showModal('Error', 'An error occurred. Please try again.', 'danger');
-            });
+                
+                showModal('Exercise Details', content, 'info');
+            } else {
+                showModal('Error', exerciseResult.message || 'Failed to load exercise', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error viewing exercise:', error);
+            showModal('Error', 'An error occurred. Please try again.', 'danger');
+        });
     }
     
     // Function to edit exercise
@@ -939,7 +1241,114 @@ document.addEventListener('DOMContentLoaded', function() {
         
         modalInstance.show();
     }
+    
+    // Add event listener for regenerate PRs button
+    const regeneratePRsBtn = document.getElementById('regeneratePRsBtn');
+    if (regeneratePRsBtn) {
+        regeneratePRsBtn.addEventListener('click', function() {
+            if (confirm('This will regenerate all personal records from your workout history. Proceed?')) {
+                regeneratePersonalRecords();
+            }
+        });
+    }
 });
+
+/**
+ * Regenerate personal records from workout history
+ */
+function regeneratePersonalRecords() {
+    const resultDiv = document.getElementById('regenerateResult');
+    const regeneratePRsBtn = document.getElementById('regeneratePRsBtn'); // Add this line to define the button
+    
+    // Show loading indicator
+    regeneratePRsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    regeneratePRsBtn.disabled = true;
+    
+    fetch('api/personal_records.php?action=regenerate_records', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        // Reset button state
+        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
+        regeneratePRsBtn.disabled = false;
+        
+        if (result.success) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    ${result.message}
+                </div>
+            `;
+            
+            // Reload the personal records section - Define the loadPersonalRecords function here
+            loadPersonalRecords();
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    ${result.message}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error regenerating personal records:', error);
+        
+        // Reset button state
+        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
+        regeneratePRsBtn.disabled = false;
+        
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                An error occurred while regenerating personal records: ${error}
+            </div>
+        `;
+    });
+}
+
+/**
+ * Load personal records
+ */
+function loadPersonalRecords() {
+    const prContainer = document.getElementById('personalRecords');
+    const prLoadingSpinner = document.getElementById('prLoadingSpinner');
+    const prErrorMessage = document.getElementById('prErrorMessage');
+    
+    if (prLoadingSpinner) prLoadingSpinner.style.display = 'block';
+    if (prContainer) prContainer.innerHTML = '';
+    if (prErrorMessage) prErrorMessage.style.display = 'none';
+    
+    fetch('api/personal_records.php?action=get_records')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
+            
+            if (result.success && result.data) {
+                renderPersonalRecords(result.data);
+            } else {
+                console.error('Failed to load personal records:', result.message);
+                if (prErrorMessage) {
+                    prErrorMessage.textContent = result.message || 'Failed to load personal records';
+                    prErrorMessage.style.display = 'block';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading personal records:', error);
+            if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
+            if (prErrorMessage) {
+                prErrorMessage.textContent = 'Error loading personal records. Please try again.';
+                prErrorMessage.style.display = 'block';
+            }
+        });
+}
 </script>
 
 <style>

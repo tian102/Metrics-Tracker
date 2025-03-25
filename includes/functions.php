@@ -233,7 +233,7 @@ function updateTrainingSession($data) {
 /**
  * Create workout details with equipment field support
  * @param array $data Workout details data
- * @return bool Success status
+ * @return bool|int ID of created workout detail or false if failed
  */
 function createWorkoutDetails($data) {
     $db = new Database();
@@ -266,7 +266,11 @@ function createWorkoutDetails($data) {
     $db->bind(':stimulus', $data['stimulus']);
     $db->bind(':fatigue_level', $data['fatigue_level']);
     
-    return $db->execute();
+    if ($db->execute()) {
+        return $db->lastInsertId(); // Return the new ID on success
+    } else {
+        return false;
+    }
 }
 
 /**

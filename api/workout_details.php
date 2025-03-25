@@ -98,7 +98,10 @@ switch ($method) {
         ];
         
         // Create workout details
-        if (createWorkoutDetails($processedData)) {
+        if ($workoutDetailId = createWorkoutDetails($processedData)) {
+            // Check for personal records after creating workout detail
+            checkForPersonalRecords($processedData, $userId, $workoutDetailId);
+            
             echo json_encode(['success' => true, 'message' => 'Workout details added successfully']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Failed to add workout details']);
@@ -146,6 +149,9 @@ switch ($method) {
         
         // Update workout details
         if (updateWorkoutDetails($processedData)) {
+            // Check for personal records after updating workout detail
+            checkForPersonalRecords($processedData, $userId, $processedData['id']);
+            
             echo json_encode(['success' => true, 'message' => 'Workout details updated successfully']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Failed to update workout details']);
@@ -184,4 +190,212 @@ switch ($method) {
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid request method']);
         break;
+}
+
+/**
+ * Check and record personal records based on workout details
+ * @param array $workoutData The workout details data
+ * @param int $userId The user ID
+ * @param int $workoutDetailId The workout detail ID
+ */
+function checkForPersonalRecords($workoutData, $userId, $workoutDetailId) {
+    if (empty($workoutData['exercise_name']) || empty($workoutData['sets']) || 
+        empty($workoutData['reps']) || empty($workoutData['load_weight'])) {
+        return; // Skip if essential workout data is missing
+    }
+    
+    $db = new Database();
+    
+    // Get exercise ID using explicit collation
+    $db->query("SELECT id FROM exercises WHERE CAST(name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci = :name");
+    $db->bind(':name', $workoutData['exercise_name']);
+    $exercise = $db->single();
+    
+    if (!$exercise) {
+        return; // Exercise not found in database
+    }
+    
+    $exerciseId = $exercise['id'];
+    $date = date('Y-m-d'); // Use current date or get from workout if available
+    
+    if (!empty($workoutData['session_id'])) {
+        // Get session date
+        $db->query("SELECT date FROM training_sessions WHERE id = :id");
+        $db->bind(':id', $workoutData['session_id']);
+        $session = $db->single();
+        
+        if ($session && !empty($session['date'])) {
+            $date = $session['date'];
+        }
+    }
+    
+    // Check for weight PR (maximum weight used)
+    checkWeightPR($userId, $exerciseId, $workoutData['load_weight'], $date, $workoutDetailId);
+    
+    // Check for reps PR (maximum reps with this weight or higher)
+    checkRepsPR($userId, $exerciseId, $workoutData['reps'], $workoutData['load_weight'], $date, $workoutDetailId);
+    
+    // Check for volume PR (sets * reps * weight)
+    $volume = $workoutData['sets'] * $workoutData['reps'] * $workoutData['load_weight'];
+    checkVolumePR($userId, $exerciseId, $volume, $date, $workoutDetailId);
+}
+
+/**
+ * Check and record a weight personal record
+ * @param int $userId The user ID
+ * @param int $exerciseId The exercise ID
+ * @param float $weight The weight lifted
+ * @param string $date The date of the workout
+ * @param int $workoutDetailId The workout detail ID
+ */
+function checkWeightPR($userId, $exerciseId, $weight, $date, $workoutDetailId) {
+    $db = new Database();
+    
+    // Get current weight PR for this exercise
+    $db->query("SELECT record_value FROM personal_records 
+                WHERE user_id = :user_id AND exercise_id = :exercise_id 
+                AND record_type = 'weight' 
+                ORDER BY record_value DESC 
+                LIMIT 1");
+    $db->bind(':user_id', $userId);
+    $db->bind(':exercise_id', $exerciseId);
+    $currentPR = $db->single();
+    
+    // If no PR exists or this weight is higher
+    if (!$currentPR || $weight > $currentPR['record_value']) {
+        // First delete any existing weight PRs for this exercise (to keep only the latest)
+        $db->query("DELETE FROM personal_records 
+                   WHERE user_id = :user_id 
+                   AND exercise_id = :exercise_id 
+                   AND record_type = 'weight'");
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->execute();
+        
+        // Insert new PR
+        $db->query("INSERT INTO personal_records 
+                  (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                  VALUES 
+                  (:user_id, :exercise_id, :record_value, 'weight', :date, :workout_detail_id, 0, NOW())");
+        
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->bind(':record_value', $weight);
+        $db->bind(':date', $date);
+        $db->bind(':workout_detail_id', $workoutDetailId);
+        
+        $db->execute();
+        
+        // Log the PR
+        error_log("New weight PR for user $userId, exercise $exerciseId: $weight kg");
+    }
+}
+
+/**
+ * Check and record a reps personal record
+ * @param int $userId The user ID
+ * @param int $exerciseId The exercise ID
+ * @param int $reps The number of reps
+ * @param float $weight The weight used
+ * @param string $date The date of the workout
+ * @param int $workoutDetailId The workout detail ID
+ */
+function checkRepsPR($userId, $exerciseId, $reps, $weight, $date, $workoutDetailId) {
+    $db = new Database();
+    
+    // Get current reps PR for this exercise with this weight or higher - with explicit collation
+    $db->query("SELECT wd.reps as record_value
+                FROM workout_details wd
+                JOIN training_sessions ts ON wd.session_id = ts.id
+                JOIN exercises e ON CAST(wd.exercise_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci = e.name
+                WHERE ts.user_id = :user_id 
+                AND e.id = :exercise_id
+                AND wd.load_weight >= :weight
+                ORDER BY wd.reps DESC
+                LIMIT 1");
+    
+    $db->bind(':user_id', $userId);
+    $db->bind(':exercise_id', $exerciseId);
+    $db->bind(':weight', $weight);
+    $currentPR = $db->single();
+    
+    // If no PR exists or this reps count is higher
+    if (!$currentPR || $reps > $currentPR['record_value']) {
+        // First delete any existing reps PRs for this exercise (to keep only the latest)
+        $db->query("DELETE FROM personal_records 
+                   WHERE user_id = :user_id 
+                   AND exercise_id = :exercise_id 
+                   AND record_type = 'reps'");
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->execute();
+        
+        // Insert new PR
+        $db->query("INSERT INTO personal_records 
+                  (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                  VALUES 
+                  (:user_id, :exercise_id, :record_value, 'reps', :date, :workout_detail_id, 0, NOW())");
+        
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->bind(':record_value', $reps);
+        $db->bind(':date', $date);
+        $db->bind(':workout_detail_id', $workoutDetailId);
+        
+        $db->execute();
+        
+        // Log the PR
+        error_log("New reps PR for user $userId, exercise $exerciseId: $reps reps with $weight kg");
+    }
+}
+
+/**
+ * Check and record a volume personal record
+ * @param int $userId The user ID
+ * @param int $exerciseId The exercise ID
+ * @param float $volume The volume (sets*reps*weight)
+ * @param string $date The date of the workout
+ * @param int $workoutDetailId The workout detail ID
+ */
+function checkVolumePR($userId, $exerciseId, $volume, $date, $workoutDetailId) {
+    $db = new Database();
+    
+    // Get current volume PR for this exercise
+    $db->query("SELECT record_value FROM personal_records 
+                WHERE user_id = :user_id AND exercise_id = :exercise_id 
+                AND record_type = 'volume' 
+                ORDER BY record_value DESC 
+                LIMIT 1");
+    $db->bind(':user_id', $userId);
+    $db->bind(':exercise_id', $exerciseId);
+    $currentPR = $db->single();
+    
+    // If no PR exists or this volume is higher
+    if (!$currentPR || $volume > $currentPR['record_value']) {
+        // First delete any existing volume PRs for this exercise (to keep only the latest)
+        $db->query("DELETE FROM personal_records 
+                   WHERE user_id = :user_id 
+                   AND exercise_id = :exercise_id 
+                   AND record_type = 'volume'");
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->execute();
+        
+        // Insert new PR
+        $db->query("INSERT INTO personal_records 
+                  (user_id, exercise_id, record_value, record_type, date, workout_detail_id, is_acknowledged, created_at) 
+                  VALUES 
+                  (:user_id, :exercise_id, :record_value, 'volume', :date, :workout_detail_id, 0, NOW())");
+        
+        $db->bind(':user_id', $userId);
+        $db->bind(':exercise_id', $exerciseId);
+        $db->bind(':record_value', $volume);
+        $db->bind(':date', $date);
+        $db->bind(':workout_detail_id', $workoutDetailId);
+        
+        $db->execute();
+        
+        // Log the PR
+        error_log("New volume PR for user $userId, exercise $exerciseId: $volume kg total volume");
+    }
 }
