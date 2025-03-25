@@ -1767,3 +1767,34 @@ body {
 .btn-sm .fas {
     margin-right: 2px;
 }
+
+/* Compact action buttons */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    justify-content: flex-start;
+}
+
+.btn-action {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    border-radius: 0.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    max-width: 30px;
+    height: 30px;
+}
+
+.btn-action i {
+    font-size: 0.8rem;
+}
+
+/* Ensure the action column doesn't take too much space */
+.table th:last-child, 
+.table td:last-child {
+    width: 1%;
+    white-space: nowrap;
+}

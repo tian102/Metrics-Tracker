@@ -335,12 +335,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Find exercises that match both muscle group and equipment
             const compatibleExercises = [];
+            console.log('Looking for exercises with muscle group:', selectedMuscleGroup, 'and equipment:', selectedEquipment);
+            
             exerciseData.exercises.forEach(exercise => {
                 // Only use exercises that exactly match both muscle group and equipment
                 if (exercise.muscle_group === selectedMuscleGroup && 
                     exercise.equipment === selectedEquipment) {
-                    // Fixed: Use 'name' for exercise names
-                    compatibleExercises.push(exercise.name);
+                    
+                    // Log every match we find for debugging
+                    console.log('Found matching exercise:', exercise);
+                    
+                    // Use exercise_name if available, otherwise use name
+                    const exerciseName = exercise.exercise_name || exercise.name;
+                    compatibleExercises.push(exerciseName);
                 }
             });
             
@@ -1314,13 +1321,17 @@ function resetSelect(selectElement) {
  */
 function processExerciseData(data) {
     // Process exercise data to ensure it has consistent property names
-    data.exercises = data.exercises.map(exercise => {
-        return {
-            ...exercise,
+    if (data.exercises && Array.isArray(data.exercises)) {
+        data.exercises = data.exercises.map(exercise => {
             // Ensure each exercise has both 'name' and 'exercise_name' properties
-            exercise_name: exercise.name
-        };
-    });
+            return {
+                ...exercise,
+                // If exercise_name is missing, add it from name
+                exercise_name: exercise.exercise_name || exercise.name 
+            };
+        });
+    }
     
-    console.log('Normalized exercise data:', data);
+    // Debug the processed data
+    console.log('Processed exercise data with name/exercise_name mapping:', data.exercises);
 }
