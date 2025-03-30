@@ -6,8 +6,10 @@
 // Add this at the top of your file, after the DOMContentLoaded listener
 window.addEventListener('unload', function() {
     // Cleanup all chart instances
-    const charts = Object.values(Chart.instances);
-    charts.forEach(chart => chart.destroy());
+    if (typeof Chart !== 'undefined') {
+        const charts = Object.values(Chart.instances || {});
+        charts.forEach(chart => chart.destroy());
+    }
 });
 
 /**
@@ -21,8 +23,8 @@ function processVisualizationData(dailyMetrics, trainingSessions, workoutDetails
     
     // Create charts if data is available
     if (dailyMetrics && dailyMetrics.length > 0) {
-        createWeightChart(dailyMetrics);
-        createSleepChart(dailyMetrics);
+        createWeightProgressChart(dailyMetrics);
+        createSleepDurationChart(dailyMetrics);
         createPersonalMetricsChart(dailyMetrics);
         createCaloriesChart(dailyMetrics);
         createMacronutrientsChart(dailyMetrics);

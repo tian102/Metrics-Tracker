@@ -319,6 +319,40 @@ foreach ($trainingSessions as $session) {
     
 </div>
 
+<!-- Add Chart.js library before our custom script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<!-- Custom styling for chart containers -->
+<style>
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.metric-card {
+    border: 1px solid rgba(0,0,0,.125);
+    border-radius: 0.25rem;
+    margin-bottom: 1.5rem;
+    height: 100%;
+}
+
+.metric-card .card-header {
+    background-color: rgba(0,0,0,.03);
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 0.75rem 1.25rem;
+}
+
+.metric-card .card-body {
+    padding: 1.25rem;
+}
+
+.tab-content {
+    padding-top: 1.5rem;
+}
+</style>
+
 <!-- Visualization JavaScript -->
 <script src="assets/js/visualize.js"></script>
 

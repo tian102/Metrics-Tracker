@@ -90,7 +90,7 @@ $userId = $_SESSION['user_id'];
             </div>
         </div>
         
-        <!-- Move Personal Records Card here (between Exercise Library and Library Stats) -->
+        <!-- Personal Records Card -->
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h3 class="mb-0">Personal Records</h3>
@@ -116,6 +116,7 @@ $userId = $_SESSION['user_id'];
             </div>
         </div>
         
+        <!-- Library Stats Card -->
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h3 class="mb-0">Library Stats</h3>
@@ -141,7 +142,7 @@ $userId = $_SESSION['user_id'];
             </div>
         </div>
         
-        <!-- Add a button to regenerate personal records for debugging/admin purposes -->
+        <!-- Actions Card -->
         <div class="row mt-3">
             <div class="col-12">
                 <div class="card shadow-sm">
@@ -246,357 +247,128 @@ $userId = $_SESSION['user_id'];
     </div>
 </div>
 
-<!-- Custom script for the exercise library page -->
+<style>
+/* Add styles for stats cards */
+.stat-card {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.stat-card h3 {
+    font-size: 2rem;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-card p {
+    color: #6c757d;
+    margin-bottom: 0;
+}
+
+.stats-row {
+    margin-bottom: 20px;
+}
+</style>
+
+<!-- Debug script to troubleshoot loading issues -->
 <script>
-// Page Initialization and Core Functionality
 document.addEventListener('DOMContentLoaded', function() {
-    // Global variables
-    let currentPage = 1;
-    const perPage = 10;
-
-    // Initial data loading
-    loadFilterOptions();
-    loadLibraryStats();
-    searchExercises();
+    // Load personal records
     loadPersonalRecords();
-
-    // Setup event listeners
-    setupEventListeners();
-    setupForms();
-
-    // Function to load filter options (muscle groups and equipment)
-    function loadFilterOptions() {
-        Promise.all([
-            fetch('api/exercise_library.php?action=muscle_groups'),
-            fetch('api/exercise_library.php?action=equipment')
-        ])
-        .then(responses => Promise.all(responses.map(r => r.json())))
-        .then(([muscleGroups, equipment]) => {
-            if (muscleGroups.success) {
-                populateFilterDropdown('muscleGroupFilter', muscleGroups.data);
-                populateFormSelect('muscle_group_id', muscleGroups.data);
-                populateFormSelect('edit_muscle_group_id', muscleGroups.data);
+    
+    // Set up the regenerate PRs button
+    const regeneratePRsBtn = document.getElementById('regeneratePRsBtn');
+    if (regeneratePRsBtn) {
+        regeneratePRsBtn.addEventListener('click', function() {
+            if (confirm('This will regenerate all personal records from your workout history. Proceed?')) {
+                regeneratePersonalRecords();
             }
-            
-            if (equipment.success) {
-                populateFilterDropdown('equipmentFilter', equipment.data);
-                populateFormSelect('equipment_id', equipment.data);
-                populateFormSelect('edit_equipment_id', equipment.data);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading filter options:', error);
         });
     }
     
-    // Function to populate a filter dropdown
-    function populateFilterDropdown(elementId, options) {
-        const select = document.getElementById(elementId);
-        if (!select) return;
+    // Define new versions of the functions that match the API's expectations
+    window.searchExercises = function(page = 1) {
+        // Reset current page when doing a new search
+        window.currentExercisePage = 1;
         
-        // Keep the default option
-        const defaultOption = select.options[0];
-        select.innerHTML = '';
-        select.appendChild(defaultOption);
+        console.log('Custom searchExercises function called');
         
-        // Add options
-        options.forEach(option => {
-            const opt = document.createElement('option');
-            opt.value = option.name;
-            opt.textContent = option.name;
-            select.appendChild(opt);
-        });
-        
-        // Add change event listener
-        select.addEventListener('change', function() {
-            currentPage = 1; // Reset to first page when filter changes
-            searchExercises();
-        });
-    }
-    
-    // Function to populate a form select dropdown
-    function populateFormSelect(elementId, options) {
-        const select = document.getElementById(elementId);
-        if (!select) return;
-        
-        // Keep the default option
-        const defaultOption = select.options[0];
-        select.innerHTML = '';
-        select.appendChild(defaultOption);
-        
-        // Add options
-        options.forEach(option => {
-            const opt = document.createElement('option');
-            opt.value = option.id;
-            opt.textContent = option.name;
-            select.appendChild(opt);
-        });
-    }
-    
-    // Function to search exercises
-    function searchExercises() {
         const searchInput = document.getElementById('searchInput');
         const muscleGroupFilter = document.getElementById('muscleGroupFilter');
         const equipmentFilter = document.getElementById('equipmentFilter');
         
         // Show loading state
-        document.getElementById('loadingSpinner').style.display = 'block';
-        document.getElementById('searchResults').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'none';
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const searchResults = document.getElementById('searchResults');
+        const errorMessage = document.getElementById('errorMessage');
         
-        // Build search params
-        const params = new URLSearchParams({
-            action: 'search',
-            page: currentPage,
-            per_page: perPage
-        });
+        if (loadingSpinner) loadingSpinner.style.display = 'block';
+        if (searchResults) searchResults.style.display = 'none';
+        if (errorMessage) errorMessage.style.display = 'none';
         
-        if (searchInput && searchInput.value) {
-            params.append('search', searchInput.value);
-        }
-        
-        if (muscleGroupFilter && muscleGroupFilter.value) {
-            params.append('muscle_group', muscleGroupFilter.value);
-        }
-        
-        if (equipmentFilter && equipmentFilter.value) {
-            params.append('equipment', equipmentFilter.value);
-        }
-        
-        // Perform search
-        fetch(`api/exercise_library.php?${params.toString()}`)
+        // Based on the API's expectations, we'll just use the default endpoint first
+        fetch('api/exercise_library.php')
             .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                console.log('API response status:', response.status);
                 return response.json();
             })
             .then(result => {
                 // Hide loading spinner
-                document.getElementById('loadingSpinner').style.display = 'none';
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
                 
                 if (result.success) {
-                    renderSearchResults(result);
-                    renderPagination(result);
+                    console.log('API data retrieved:', result);
+                    // Filter results client-side based on search parameters
+                    let filteredData = result.data.exercises;
+                    
+                    if (searchInput && searchInput.value) {
+                        const searchTerm = searchInput.value.toLowerCase();
+                        filteredData = filteredData.filter(ex => 
+                            ex.name.toLowerCase().includes(searchTerm) || 
+                            ex.muscle_group.toLowerCase().includes(searchTerm) || 
+                            ex.equipment.toLowerCase().includes(searchTerm)
+                        );
+                    }
+                    
+                    if (muscleGroupFilter && muscleGroupFilter.value) {
+                        filteredData = filteredData.filter(ex => 
+                            ex.muscle_group === muscleGroupFilter.value
+                        );
+                    }
+                    
+                    if (equipmentFilter && equipmentFilter.value) {
+                        filteredData = filteredData.filter(ex => 
+                            ex.equipment === equipmentFilter.value
+                        );
+                    }
+                    
+                    // Display results
+                    renderSearchResults(filteredData);
                 } else {
                     console.error('Search failed:', result.message);
-                    const errorMessage = document.getElementById('errorMessage');
-                    errorMessage.textContent = result.message || 'Error loading exercises';
-                    errorMessage.style.display = 'block';
+                    if (errorMessage) {
+                        errorMessage.textContent = result.message || 'Error loading exercises';
+                        errorMessage.style.display = 'block';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error searching exercises:', error);
-                document.getElementById('loadingSpinner').style.display = 'none';
-                const errorMessage = document.getElementById('errorMessage');
-                errorMessage.textContent = 'Error loading exercises. Please try again.';
-                errorMessage.style.display = 'block';
-            });
-    }
-    
-    // Function to render search results
-    function renderSearchResults(result) {
-        const resultsBody = document.getElementById('resultsBody');
-        const searchResults = document.getElementById('searchResults');
-        
-        if (!resultsBody || !searchResults) return;
-        
-        if (!result.data || result.data.length === 0) {
-            resultsBody.innerHTML = `
-                <tr>
-                    <td colspan="4" class="text-center">No exercises found</td>
-                </tr>
-            `;
-            searchResults.style.display = 'block';
-            return;
-        }
-        
-        let html = '';
-        result.data.forEach(exercise => {
-            html += `
-                <tr>
-                    <td>${exercise.name}</td>
-                    <td>${exercise.muscle_group}</td>
-                    <td>${exercise.equipment}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn btn-action btn-outline-primary view-exercise-btn" data-id="${exercise.id}" title="View">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-action btn-outline-secondary edit-exercise-btn" data-id="${exercise.id}" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-action btn-outline-danger delete-exercise-btn" data-id="${exercise.id}" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        resultsBody.innerHTML = html;
-        searchResults.style.display = 'block';
-        
-        // Add event listeners to buttons
-        document.querySelectorAll('.view-exercise-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const exerciseId = this.getAttribute('data-id');
-                viewExercise(exerciseId);
-            });
-        });
-        
-        document.querySelectorAll('.edit-exercise-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const exerciseId = this.getAttribute('data-id');
-                editExercise(exerciseId);
-            });
-        });
-        
-        // Add event listeners for delete buttons
-        document.querySelectorAll('.delete-exercise-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const exerciseId = this.getAttribute('data-id');
-                deleteExercise(exerciseId);
-            });
-        });
-    }
-    
-    // Function to render pagination
-    function renderPagination(result) {
-        const paginationContainer = document.getElementById('searchPagination');
-        if (!paginationContainer) return;
-        
-        // Make sure result and its pagination property exist
-        if (!result || !result.pagination) {
-            paginationContainer.innerHTML = '';
-            return;
-        }
-        
-        const pagination = result.pagination;
-        
-        // Guard against missing properties in pagination
-        if (!pagination || typeof pagination !== 'object') {
-            console.error('Invalid pagination object:', pagination);
-            paginationContainer.innerHTML = '';
-            return;
-        }
-        
-        // Safely access total_count with fallback to 0
-        const totalCount = (pagination.total_count !== undefined) ? parseInt(pagination.total_count) : 0;
-        const perPage = (pagination.per_page !== undefined) ? parseInt(pagination.per_page) : 10;
-        const currentPageNum = (pagination.current_page !== undefined) ? parseInt(pagination.current_page) : 1;
-        
-        // Calculate total pages with a safe fallback
-        const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
-        
-        if (totalPages <= 1) {
-            paginationContainer.innerHTML = '';
-            return;
-        }
-        
-        let paginationHTML = '<ul class="pagination justify-content-center">';
-        
-        // Previous page button
-        paginationHTML += `
-            <li class="page-item ${currentPageNum === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${currentPageNum - 1}" aria-label="Previous">
-                    <span aria-hidden="true">&laquo;</span>
-                </a>
-            </li>
-        `;
-        
-        // Calculate which page numbers to show with ellipsis for large page counts
-        const showEllipsis = totalPages > 7;
-        const pageNumbers = [];
-        
-        if (showEllipsis) {
-            // Always show first page
-            pageNumbers.push(1);
-            
-            // Determine range around current page
-            let rangeStart = Math.max(2, currentPageNum - 1);
-            let rangeEnd = Math.min(totalPages - 1, currentPageNum + 1);
-            
-            // Adjust range to always show 3 pages if possible
-            if (rangeEnd - rangeStart < 2) {
-                if (rangeStart === 2) {
-                    rangeEnd = Math.min(totalPages - 1, rangeStart + 2);
-                } else if (rangeEnd === totalPages - 1) {
-                    rangeStart = Math.max(2, rangeEnd - 2);
-                }
-            }
-            
-            // Add ellipsis before range if needed
-            if (rangeStart > 2) {
-                pageNumbers.push('ellipsis-start');
-            }
-            
-            // Add range pages
-            for (let i = rangeStart; i <= rangeEnd; i++) {
-                pageNumbers.push(i);
-            }
-            
-            // Add ellipsis after range if needed
-            if (rangeEnd < totalPages - 1) {
-                pageNumbers.push('ellipsis-end');
-            }
-            
-            // Always show last page
-            if (totalPages > 1) {
-                pageNumbers.push(totalPages);
-            }
-        } else {
-            // Show all pages if there are just a few
-            for (let i = 1; i <= totalPages; i++) {
-                pageNumbers.push(i);
-            }
-        }
-        
-        // Generate page number buttons
-        pageNumbers.forEach(page => {
-            if (page === 'ellipsis-start' || page === 'ellipsis-end') {
-                paginationHTML += `
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                `;
-            } else {
-                paginationHTML += `
-                    <li class="page-item ${currentPageNum === page ? 'active' : ''}">
-                        <a class="page-link" href="#" data-page="${page}">${page}</a>
-                    </li>
-                `;
-            }
-        });
-        
-        // Next page button
-        paginationHTML += `
-            <li class="page-item ${currentPageNum === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${currentPageNum + 1}" aria-label="Next">
-                    <span aria-hidden="true">&raquo;</span>
-                </a>
-            </li>
-        `;
-        
-        paginationHTML += '</ul>';
-        paginationContainer.innerHTML = paginationHTML;
-        
-        // Add event listeners to pagination links
-        document.querySelectorAll('#searchPagination .page-link').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const page = parseInt(this.getAttribute('data-page'));
-                if (!isNaN(page) && page > 0) {
-                    currentPage = page;
-                    searchExercises();
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                if (errorMessage) {
+                    errorMessage.textContent = 'Error loading exercises. Please try again.';
+                    errorMessage.style.display = 'block';
                 }
             });
-        });
-    }
-    
-    // Function to load library stats
-    function loadLibraryStats() {
+    };
+
+    window.loadLibraryStats = function() {
+        console.log('Custom loadLibraryStats function called');
+        
         const statsContainer = document.getElementById('libraryStats');
         const statsLoadingSpinner = document.getElementById('statsLoadingSpinner');
         const statsErrorMessage = document.getElementById('statsErrorMessage');
@@ -605,19 +377,74 @@ document.addEventListener('DOMContentLoaded', function() {
         if (statsContainer) statsContainer.innerHTML = '';
         if (statsErrorMessage) statsErrorMessage.style.display = 'none';
         
-        fetch('api/exercise_library.php?action=stats')
+        // We'll use the default API endpoint to get all exercise data
+        fetch('api/exercise_library.php')
             .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                console.log('Stats API response status:', response.status);
                 return response.json();
             })
             .then(result => {
                 if (statsLoadingSpinner) statsLoadingSpinner.style.display = 'none';
                 
                 if (result.success && result.data) {
-                    const stats = result.data;
+                    console.log('Stats API data retrieved:', result);
                     
+                    // Calculate stats from the data
+                    const data = result.data;
+                    const muscleGroups = data.muscle_groups;
+                    const equipment = data.equipment;
+                    const exercises = data.exercises;
+                    
+                    // Create stats object
+                    const stats = {
+                        total_exercises: exercises.length,
+                        total_muscle_groups: muscleGroups.length,
+                        total_equipment: equipment.length,
+                        exercises_by_muscle_group: [],
+                        exercises_by_equipment: []
+                    };
+                    
+                    // Count exercises by muscle group
+                    const mgCounts = {};
+                    exercises.forEach(ex => {
+                        if (!mgCounts[ex.muscle_group]) {
+                            mgCounts[ex.muscle_group] = 0;
+                        }
+                        mgCounts[ex.muscle_group]++;
+                    });
+                    
+                    // Convert to array
+                    Object.keys(mgCounts).forEach(mg => {
+                        stats.exercises_by_muscle_group.push({
+                            muscle_group: mg,
+                            exercise_count: mgCounts[mg]
+                        });
+                    });
+                    
+                    // Sort by count (descending)
+                    stats.exercises_by_muscle_group.sort((a, b) => b.exercise_count - a.exercise_count);
+                    
+                    // Count exercises by equipment
+                    const eqCounts = {};
+                    exercises.forEach(ex => {
+                        if (!eqCounts[ex.equipment]) {
+                            eqCounts[ex.equipment] = 0;
+                        }
+                        eqCounts[ex.equipment]++;
+                    });
+                    
+                    // Convert to array
+                    Object.keys(eqCounts).forEach(eq => {
+                        stats.exercises_by_equipment.push({
+                            equipment: eq,
+                            exercise_count: eqCounts[eq]
+                        });
+                    });
+                    
+                    // Sort by count (descending)
+                    stats.exercises_by_equipment.sort((a, b) => b.exercise_count - a.exercise_count);
+                    
+                    // Render stats
                     if (statsContainer) {
                         let html = `
                             <div class="row stats-row">
@@ -642,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         `;
                         
-                        if (stats.exercises_by_muscle_group && stats.exercises_by_muscle_group.length > 0) {
+                        if (stats.exercises_by_muscle_group.length > 0) {
                             html += `
                                 <div class="row stats-row mt-4">
                                     <div class="col-md-6">
@@ -665,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                         }
                         
-                        if (stats.exercises_by_equipment && stats.exercises_by_equipment.length > 0) {
+                        if (stats.exercises_by_equipment.length > 0) {
                             html += `
                                     <div class="col-md-6">
                                         <h5>Exercises by Equipment</h5>
@@ -704,293 +531,340 @@ document.addEventListener('DOMContentLoaded', function() {
                     statsErrorMessage.style.display = 'block';
                 }
             });
-    }
-    
-    // Function to load personal records
-    function loadPersonalRecords() {
-        const prContainer = document.getElementById('personalRecords');
-        const prLoadingSpinner = document.getElementById('prLoadingSpinner');
-        const prErrorMessage = document.getElementById('prErrorMessage');
+    };
+
+    // Load filter options for the form
+    window.loadFilterOptions = function() {
+        console.log('Custom loadFilterOptions function called');
         
-        if (prLoadingSpinner) prLoadingSpinner.style.display = 'block';
-        if (prContainer) prContainer.innerHTML = '';
-        if (prErrorMessage) prErrorMessage.style.display = 'none';
-        
-        fetch('api/personal_records.php?action=get_records')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
+        fetch('api/exercise_library.php')
+            .then(response => response.json())
             .then(result => {
-                if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
-                
-                if (result.success && result.data) {
-                    renderPersonalRecords(result.data);
-                } else {
-                    console.error('Failed to load personal records:', result.message);
-                    if (prErrorMessage) {
-                        prErrorMessage.textContent = result.message || 'Failed to load personal records';
-                        prErrorMessage.style.display = 'block';
-                    }
+                if (result.success) {
+                    const muscleGroups = result.data.muscle_groups;
+                    const equipment = result.data.equipment;
+                    
+                    // Populate muscle group filter
+                    populateFilterDropdown('muscleGroupFilter', muscleGroups);
+                    
+                    // Populate equipment filter
+                    populateFilterDropdown('equipmentFilter', equipment);
                 }
             })
             .catch(error => {
-                console.error('Error loading personal records:', error);
-                if (prLoadingSpinner) prLoadingSpinner.style.display = 'none';
-                if (prErrorMessage) {
-                    prErrorMessage.textContent = 'Error loading personal records. Please try again.';
-                    prErrorMessage.style.display = 'block';
-                }
+                console.error('Error loading filter options:', error);
             });
-    }
-    
-    // Function to render personal records
-    function renderPersonalRecords(records) {
-        const prContainer = document.getElementById('personalRecords');
-        if (!prContainer) return;
+    };
+
+    // Populate filter dropdown with options
+    window.populateFilterDropdown = function(elementId, options) {
+        const select = document.getElementById(elementId);
+        if (!select) return;
         
-        if (!records || records.length === 0) {
-            prContainer.innerHTML = `
-                <div class="text-center py-3">
-                    <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
-                    <p class="mb-0">No personal records available yet.</p>
-                </div>
-            `;
+        // Keep the first option (default "All" option)
+        const defaultOption = select.options[0];
+        select.innerHTML = '';
+        select.appendChild(defaultOption);
+        
+        // Add options
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.name;
+            opt.textContent = option.name;
+            select.appendChild(opt);
+        });
+        
+        // Add change event listener
+        select.addEventListener('change', function() {
+            searchExercises();
+        });
+    };
+
+    // Render search results in a table with pagination
+    window.renderSearchResults = function(exerciseData) {
+        const resultsBody = document.getElementById('resultsBody');
+        const searchResults = document.getElementById('searchResults');
+        const paginationContainer = document.getElementById('searchPagination');
+        
+        if (!resultsBody || !searchResults) {
+            console.error('Results container not found');
             return;
         }
         
-        // Group records by exercise and record type to find latest records
-        const latestRecords = {};
-        
-        records.forEach(record => {
-            const key = `${record.exercise_id}_${record.record_type}`;
-            
-            // If we haven't seen this exercise/record type combo yet, or if this record is newer
-            if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
-                latestRecords[key] = record;
+        if (!exerciseData || exerciseData.length === 0) {
+            resultsBody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center">No exercises found</td>
+                </tr>
+            `;
+            searchResults.style.display = 'block';
+            if (paginationContainer) {
+                paginationContainer.innerHTML = '';
             }
-        });
+            return;
+        }
         
-        // Convert the object of latest records back to an array
-        const latestRecordsArray = Object.values(latestRecords);
+        // Pagination setup
+        const itemsPerPage = 10;
+        const totalPages = Math.ceil(exerciseData.length / itemsPerPage);
         
-        // Group records by exercise name for display
-        const recordsByExercise = {};
+        // Get current page from the page state or default to 1
+        const currentPage = window.currentExercisePage || 1;
         
-        latestRecordsArray.forEach(record => {
-            if (!recordsByExercise[record.exercise_name]) {
-                recordsByExercise[record.exercise_name] = [];
-            }
-            recordsByExercise[record.exercise_name].push(record);
-        });
+        // Calculate start and end indices for the current page
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, exerciseData.length);
         
-        let html = `
-            <div class="accordion" id="accordionPersonalRecords">
-        `;
+        // Get data for the current page
+        const currentPageData = exerciseData.slice(startIndex, endIndex);
         
-        // Sort exercises alphabetically
-        const sortedExercises = Object.keys(recordsByExercise).sort();
-        
-        sortedExercises.forEach((exerciseName, index) => {
-            const recordsList = recordsByExercise[exerciseName];
-            const headingId = `heading${index}`;
-            const collapseId = `collapse${index}`;
-            
+        // Render the results
+        let html = '';
+        currentPageData.forEach(exercise => {
             html += `
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="${headingId}">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-                            <strong>${exerciseName}</strong> <span class="badge bg-primary ms-2">${recordsList.length}</span>
+                <tr>
+                    <td>${exercise.name}</td>
+                    <td>${exercise.muscle_group}</td>
+                    <td>${exercise.equipment}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary view-exercise-btn" data-id="${exercise.id}">
+                            <i class="fas fa-eye"></i>
                         </button>
-                    </h2>
-                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#accordionPersonalRecords">
-                        <div class="accordion-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Type</th>
-                                            <th>Value</th>
-                                            <th>Date</th>
-                                            <th>Muscle Group</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-            `;
-            
-            // Sort records by date (newest first)
-            recordsList.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            recordsList.forEach(record => {
-                const recordType = formatRecordType(record.record_type);
-                const recordValue = formatRecordValue(record.record_value, record.record_type);
-                const dateStr = formatDate(record.date);
-                const isNew = !record.is_acknowledged;
-                
-                html += `
-                    <tr ${isNew ? 'class="table-warning"' : ''}>
-                        <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
-                        <td>${recordValue}</td>
-                        <td>${dateStr}</td>
-                        <td>${record.muscle_group}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        <button class="btn btn-sm btn-outline-secondary edit-exercise-btn" data-id="${exercise.id}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
             `;
         });
         
-        html += `
-            </div>
-        `;
+        resultsBody.innerHTML = html;
+        searchResults.style.display = 'block';
         
-        prContainer.innerHTML = html;
-    }
-    
-    // Function to format a record type for display
-    function formatRecordType(type) {
-        switch (type) {
-            case 'weight':
-                return 'Weight PR';
-            case 'reps':
-                return 'Reps PR';
-            case 'volume':
-                return 'Volume PR';
-            case 'time':
-                return 'Time PR';
-            default:
-                return type;
-        }
-    }
-    
-    // Function to format a record value for display
-    function formatRecordValue(value, type) {
-        switch (type) {
-            case 'weight':
-                return `${value} kg`;
-            case 'reps':
-                return `${value} reps`;
-            case 'volume':
-                return `${value} kg (volume)`;
-            case 'time':
-                return `${value} seconds`;
-            default:
-                return value;
-        }
-    }
-    
-    // Function to format a date for display
-    function formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    
-    // Function to view exercise details
-    function viewExercise(exerciseId) {
-        Promise.all([
-            fetch(`api/exercise_library.php?action=get_exercise&id=${exerciseId}`),
-            fetch(`api/personal_records.php?action=get_exercise_records&exercise_id=${exerciseId}`)
-        ])
-        .then(responses => Promise.all(responses.map(r => r.json())))
-        .then(([exerciseResult, recordsResult]) => {
-            if (exerciseResult.success) {
-                const exercise = exerciseResult.data;
-                
-                let content = `
-                    <div class="mb-4">
-                        <p><strong>Exercise:</strong> ${exercise.name}</p>
-                        <p><strong>Muscle Group:</strong> ${exercise.muscle_group}</p>
-                        <p><strong>Equipment:</strong> ${exercise.equipment}</p>
-                        <p><strong>Description:</strong> ${exercise.description || 'No description available'}</p>
-                    </div>
+        // Render pagination if needed
+        if (totalPages > 1 && paginationContainer) {
+            let paginationHtml = '<ul class="pagination justify-content-center">';
+            
+            // Previous button
+            paginationHtml += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage - 1}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            `;
+            
+            // Page numbers
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+            
+            // Adjust if we're at the end
+            if (endPage - startPage + 1 < maxPagesToShow) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+            
+            // First page
+            if (startPage > 1) {
+                paginationHtml += `
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="1">1</a>
+                    </li>
                 `;
-                
-                // Add personal records section if available
-                if (recordsResult.success && recordsResult.data && recordsResult.data.length > 0) {
-                    // Filter to only show latest record for each record type
-                    const latestRecords = {};
-                    
-                    recordsResult.data.forEach(record => {
-                        const key = record.record_type;
-                        
-                        if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
-                            latestRecords[key] = record;
-                        }
-                    });
-                    
-                    // Convert back to array and sort by date (newest first)
-                    const latestRecordsArray = Object.values(latestRecords);
-                    latestRecordsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    
-                    if (latestRecordsArray.length > 0) {
-                        content += `
-                            <div class="mt-4">
-                                <h5>Personal Records</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Type</th>
-                                                <th>Value</th>
-                                                <th>Date</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                        `;
-                        
-                        latestRecordsArray.forEach(record => {
-                            const recordType = formatRecordType(record.record_type);
-                            const recordValue = formatRecordValue(record.record_value, record.record_type);
-                            const dateStr = formatDate(record.date);
-                            const isNew = !record.is_acknowledged;
-                            
-                            content += `
-                                <tr ${isNew ? 'class="table-warning"' : ''}>
-                                    <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
-                                    <td>${recordValue}</td>
-                                    <td>${dateStr}</td>
-                                </tr>
-                            `;
-                        });
-                        
-                        content += `
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        `;
-                    }
-                } else {
-                    content += `
-                        <div class="mt-4">
-                            <h5>Personal Records</h5>
-                            <p class="text-muted">No personal records available for this exercise.</p>
-                        </div>
+                if (startPage > 2) {
+                    paginationHtml += `
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#">...</a>
+                        </li>
                     `;
                 }
-                
-                showModal('Exercise Details', content, 'info');
-            } else {
-                showModal('Error', exerciseResult.message || 'Failed to load exercise', 'danger');
             }
-        })
-        .catch(error => {
-            console.error('Error viewing exercise:', error);
-            showModal('Error', 'An error occurred. Please try again.', 'danger');
+            
+            // Page numbers
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHtml += `
+                    <li class="page-item ${currentPage === i ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>
+                `;
+            }
+            
+            // Last page
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationHtml += `
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#">...</a>
+                        </li>
+                    `;
+                }
+                paginationHtml += `
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a>
+                    </li>
+                `;
+            }
+            
+            // Next button
+            paginationHtml += `
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage + 1}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            `;
+            
+            paginationHtml += '</ul>';
+            paginationContainer.innerHTML = paginationHtml;
+            
+            // Add click event listeners to pagination links
+            paginationContainer.querySelectorAll('.page-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const pageNum = parseInt(this.getAttribute('data-page'));
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+                        window.currentExercisePage = pageNum;
+                        // Re-render with the same data but different page
+                        renderSearchResults(exerciseData);
+                        // Scroll to the top of the results
+                        searchResults.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+        } else if (paginationContainer) {
+            paginationContainer.innerHTML = '';
+        }
+        
+        // Add event listeners to buttons
+        document.querySelectorAll('.view-exercise-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const exerciseId = this.getAttribute('data-id');
+                viewExercise(exerciseId);
+            });
         });
-    }
-    
-    // Function to edit exercise
-    function editExercise(exerciseId) {
+        
+        document.querySelectorAll('.edit-exercise-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const exerciseId = this.getAttribute('data-id');
+                editExercise(exerciseId);
+            });
+        });
+    };
+
+    // View an exercise
+    window.viewExercise = function(exerciseId) {
+        fetch(`api/exercise_library.php?action=get_exercise&id=${exerciseId}`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    const exercise = result.data;
+                    
+                    // Get personal records for this exercise
+                    fetch(`api/personal_records.php?action=get_exercise_records&exercise_id=${exerciseId}`)
+                        .then(response => response.json())
+                        .then(recordsResult => {
+                            let content = `
+                                <div>
+                                    <p><strong>Exercise:</strong> ${exercise.name}</p>
+                                    <p><strong>Muscle Group:</strong> ${exercise.muscle_group}</p>
+                                    <p><strong>Equipment:</strong> ${exercise.equipment}</p>
+                                    <p><strong>Description:</strong> ${exercise.description || 'No description available'}</p>
+                                </div>
+                            `;
+                            
+                            // Add personal records section if available
+                            if (recordsResult.success && recordsResult.data && recordsResult.data.length > 0) {
+                                // Filter to only show latest record for each record type
+                                const latestRecords = {};
+                                
+                                recordsResult.data.forEach(record => {
+                                    const key = record.record_type;
+                                    
+                                    if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
+                                        latestRecords[key] = record;
+                                    }
+                                });
+                                
+                                // Convert back to array and sort by date (newest first)
+                                const latestRecordsArray = Object.values(latestRecords);
+                                latestRecordsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                
+                                if (latestRecordsArray.length > 0) {
+                                    content += `
+                                        <div class="mt-4">
+                                            <h5>Personal Records</h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Type</th>
+                                                            <th>Value</th>
+                                                            <th>Date</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                    `;
+                                    
+                                    latestRecordsArray.forEach(record => {
+                                        const recordType = formatRecordType(record.record_type);
+                                        const recordValue = formatRecordValue(record.record_value, record.record_type);
+                                        const dateStr = formatDate(record.date);
+                                        const isNew = !record.is_acknowledged;
+                                        
+                                        content += `
+                                            <tr ${isNew ? 'class="table-warning"' : ''}>
+                                                <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
+                                                <td>${recordValue}</td>
+                                                <td>${dateStr}</td>
+                                            </tr>
+                                        `;
+                                    });
+                                    
+                                    content += `
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            } else {
+                                content += `
+                                    <div class="mt-4">
+                                        <h5>Personal Records</h5>
+                                        <p class="text-muted">No personal records available for this exercise.</p>
+                                    </div>
+                                `;
+                            }
+                            
+                            showModal('Exercise Details', content, 'info');
+                        })
+                        .catch(error => {
+                            console.error('Error loading personal records:', error);
+                            showModal('Exercise Details', `
+                                <div>
+                                    <p><strong>Exercise:</strong> ${exercise.name}</p>
+                                    <p><strong>Muscle Group:</strong> ${exercise.muscle_group}</p>
+                                    <p><strong>Equipment:</strong> ${exercise.equipment}</p>
+                                    <p><strong>Description:</strong> ${exercise.description || 'No description available'}</p>
+                                    <div class="mt-4">
+                                        <h5>Personal Records</h5>
+                                        <p class="text-danger">Error loading personal records</p>
+                                    </div>
+                                </div>
+                            `, 'info');
+                        });
+                } else {
+                    showModal('Error', result.message || 'Failed to load exercise', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error viewing exercise:', error);
+                showModal('Error', 'An error occurred. Please try again.', 'danger');
+            });
+    };
+
+    // Edit an exercise
+    window.editExercise = function(exerciseId) {
         fetch(`api/exercise_library.php?action=get_exercise&id=${exerciseId}`)
             .then(response => response.json())
             .then(result => {
@@ -1004,26 +878,51 @@ document.addEventListener('DOMContentLoaded', function() {
                         form.querySelector('[name="name"]').value = exercise.name;
                         form.querySelector('[name="description"]').value = exercise.description || '';
                         
-                        // Set select values
-                        const muscleGroupSelect = form.querySelector('[name="muscle_group_id"]');
-                        const equipmentSelect = form.querySelector('[name="equipment_id"]');
-                        
-                        // Find and select the right options by matching texts
-                        const setSelectByText = function(select, text) {
-                            for (let i = 0; i < select.options.length; i++) {
-                                if (select.options[i].textContent === text) {
-                                    select.selectedIndex = i;
-                                    break;
+                        // Load form options
+                        fetch('api/exercise_library.php')
+                            .then(response => response.json())
+                            .then(optionsResult => {
+                                if (optionsResult.success) {
+                                    const muscleGroups = optionsResult.data.muscle_groups;
+                                    const equipment = optionsResult.data.equipment;
+                                    
+                                    // Populate form selects
+                                    const muscleGroupSelect = form.querySelector('[name="muscle_group_id"]');
+                                    const equipmentSelect = form.querySelector('[name="equipment_id"]');
+                                    
+                                    // Clear existing options
+                                    muscleGroupSelect.innerHTML = '<option value="">Select muscle group</option>';
+                                    equipmentSelect.innerHTML = '<option value="">Select equipment</option>';
+                                    
+                                    // Add muscle group options
+                                    muscleGroups.forEach(mg => {
+                                        const opt = document.createElement('option');
+                                        opt.value = mg.id;
+                                        opt.textContent = mg.name;
+                                        opt.selected = (mg.name === exercise.muscle_group);
+                                        muscleGroupSelect.appendChild(opt);
+                                    });
+                                    
+                                    // Add equipment options
+                                    equipment.forEach(eq => {
+                                        const opt = document.createElement('option');
+                                        opt.value = eq.id;
+                                        opt.textContent = eq.name;
+                                        opt.selected = (eq.name === exercise.equipment);
+                                        equipmentSelect.appendChild(opt);
+                                    });
+                                    
+                                    // Show modal
+                                    const modal = new bootstrap.Modal(document.getElementById('editExerciseModal'));
+                                    modal.show();
+                                } else {
+                                    showModal('Error', 'Failed to load form options', 'danger');
                                 }
-                            }
-                        };
-                        
-                        setSelectByText(muscleGroupSelect, exercise.muscle_group);
-                        setSelectByText(equipmentSelect, exercise.equipment);
-                        
-                        // Show modal
-                        const editModal = new bootstrap.Modal(document.getElementById('editExerciseModal'));
-                        editModal.show();
+                            })
+                            .catch(error => {
+                                console.error('Error loading form options:', error);
+                                showModal('Error', 'An error occurred while loading form options', 'danger');
+                            });
                     }
                 } else {
                     showModal('Error', result.message || 'Failed to load exercise', 'danger');
@@ -1033,146 +932,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error editing exercise:', error);
                 showModal('Error', 'An error occurred. Please try again.', 'danger');
             });
-    }
-    
-    // Function to delete exercise
-    function deleteExercise(exerciseId) {
-        if (!confirm('Are you sure you want to delete this exercise? This action cannot be undone.')) {
-            return;
-        }
-        
-        fetch('api/exercise_library.php?action=delete_exercise', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id: exerciseId })
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showModal('Success', 'Exercise deleted successfully!', 'success');
-                
-                // Refresh data
-                loadLibraryStats();
-                searchExercises();
-            } else {
-                showModal('Error', result.message || 'Failed to delete exercise', 'danger');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting exercise:', error);
-            showModal('Error', 'An error occurred. Please try again.', 'danger');
-        });
-    }
-    
-    // Function to set up event listeners
-    function setupEventListeners() {
-        // Search form submission
-        const searchForm = document.getElementById('searchForm');
-        if (searchForm) {
-            searchForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                currentPage = 1;
-                searchExercises();
-            });
-            
-            // Reset form handler
-            searchForm.addEventListener('reset', function() {
-                setTimeout(function() {
-                    currentPage = 1;
-                    searchExercises();
-                }, 10);
-            });
-        }
-    }
-    
-    // Function to set up form handlers
-    function setupForms() {
-        // Add Exercise Form
-        const addExerciseForm = document.getElementById('addExerciseForm');
-        if (addExerciseForm) {
-            addExerciseForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData(this);
-                const data = Object.fromEntries(formData.entries());
-                
-                fetch('api/exercise_library.php?action=add_exercise', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        // Show success message
-                        showModal('Success', 'Exercise added successfully!', 'success');
-                        
-                        // Reset form and close modal
-                        addExerciseForm.reset();
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('addExerciseModal'));
-                        if (modal) modal.hide();
-                        
-                        // Refresh data
-                        loadLibraryStats();
-                        searchExercises();
-                    } else {
-                        showModal('Error', result.message || 'Failed to add exercise', 'danger');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error adding exercise:', error);
-                    showModal('Error', 'An error occurred. Please try again.', 'danger');
-                });
-            });
-        }
-        
-        // Edit Exercise Form
-        const editExerciseForm = document.getElementById('editExerciseForm');
-        if (editExerciseForm) {
-            editExerciseForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData(this);
-                const data = Object.fromEntries(formData.entries());
-                
-                fetch('api/exercise_library.php?action=update_exercise', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        // Show success message
-                        showModal('Success', 'Exercise updated successfully!', 'success');
-                        
-                        // Close modal
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('editExerciseModal'));
-                        if (modal) modal.hide();
-                        
-                        // Refresh data
-                        loadLibraryStats();
-                        searchExercises();
-                    } else {
-                        showModal('Error', result.message || 'Failed to update exercise', 'danger');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating exercise:', error);
-                    showModal('Error', 'An error occurred. Please try again.', 'danger');
-                });
-            });
-        }
-    }
-    
-    // Function to show a modal with custom content
-    function showModal(title, content, type) {
+    };
+
+    // Show modal with custom content
+    window.showModal = function(title, content, type) {
         // Create modal if it doesn't exist
         let modal = document.getElementById('dynamicModal');
         
@@ -1181,14 +944,12 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.id = 'dynamicModal';
             modal.className = 'modal fade';
             modal.setAttribute('tabindex', '-1');
-            modal.setAttribute('role', 'dialog');
-            modal.setAttribute('aria-labelledby', 'dynamicModalTitle');
             
             modal.innerHTML = `
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title" id="dynamicModalTitle"></h5>
+                            <h5 class="modal-title"></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body"></div>
@@ -1214,35 +975,116 @@ document.addEventListener('DOMContentLoaded', function() {
             modalBody.appendChild(content);
         }
         
-        // Create and show modal with proper focus management
-        const modalInstance = new bootstrap.Modal(modal, {
-            keyboard: true,
-            focus: true,
-            backdrop: true
-        });
-        
-        // Add event listener to handle focus properly
-        modal.addEventListener('hidden.bs.modal', function () {
-            // Remove aria-hidden when modal is hidden
-            this.removeAttribute('aria-hidden');
-        });
-        
-        // Add event listener for when modal is shown
-        modal.addEventListener('shown.bs.modal', function () {
-            // Focus the first focusable element in the modal
-            const focusableElements = this.querySelectorAll(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-            );
-            
-            if (focusableElements.length > 0) {
-                focusableElements[0].focus();
-            }
-        });
-        
+        // Show modal
+        const modalInstance = new bootstrap.Modal(modal);
         modalInstance.show();
+    };
+
+    // Form submission handlers
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        searchExercises();
+    });
+    
+    document.getElementById('searchForm').addEventListener('reset', function() {
+        setTimeout(searchExercises, 10);
+    });
+    
+    // Add exercise form setup
+    const addExerciseForm = document.getElementById('addExerciseForm');
+    if (addExerciseForm) {
+        addExerciseForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(addExerciseForm);
+            const data = Object.fromEntries(formData.entries());
+            
+            fetch('api/exercise_library.php?action=add_exercise', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    // Show success message
+                    showModal('Success', 'Exercise added successfully!', 'success');
+                    
+                    // Reset form and close modal
+                    addExerciseForm.reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addExerciseModal'));
+                    if (modal) modal.hide();
+                    
+                    // Refresh data
+                    loadLibraryStats();
+                    searchExercises();
+                } else {
+                    showModal('Error', result.message || 'Failed to add exercise', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error adding exercise:', error);
+                showModal('Error', 'An error occurred. Please try again.', 'danger');
+            });
+        });
     }
     
-    // Add event listener for regenerate PRs button
+    // Edit exercise form setup
+    const editExerciseForm = document.getElementById('editExerciseForm');
+    if (editExerciseForm) {
+        editExerciseForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(editExerciseForm);
+            const data = Object.fromEntries(formData.entries());
+            
+            fetch('api/exercise_library.php?action=update_exercise', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    // Show success message
+                    showModal('Success', 'Exercise updated successfully!', 'success');
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editExerciseModal'));
+                    if (modal) modal.hide();
+                    
+                    // Refresh data
+                    loadLibraryStats();
+                    searchExercises();
+                } else {
+                    showModal('Error', result.message || 'Failed to update exercise', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating exercise:', error);
+                showModal('Error', 'An error occurred. Please try again.', 'danger');
+            });
+        });
+    }
+    
+    // Initialize everything
+    loadFilterOptions();
+    loadLibraryStats();
+    searchExercises();
+});
+</script>
+
+<!-- Script for handling personal records functions -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load personal records
+    loadPersonalRecords();
+    
+    // Set up the regenerate PRs button
     const regeneratePRsBtn = document.getElementById('regeneratePRsBtn');
     if (regeneratePRsBtn) {
         regeneratePRsBtn.addEventListener('click', function() {
@@ -1252,61 +1094,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-/**
- * Regenerate personal records from workout history
- */
-function regeneratePersonalRecords() {
-    const resultDiv = document.getElementById('regenerateResult');
-    const regeneratePRsBtn = document.getElementById('regeneratePRsBtn'); // Add this line to define the button
-    
-    // Show loading indicator
-    regeneratePRsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    regeneratePRsBtn.disabled = true;
-    
-    fetch('api/personal_records.php?action=regenerate_records', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(result => {
-        // Reset button state
-        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
-        regeneratePRsBtn.disabled = false;
-        
-        if (result.success) {
-            resultDiv.innerHTML = `
-                <div class="alert alert-success">
-                    ${result.message}
-                </div>
-            `;
-            
-            // Reload the personal records section - Define the loadPersonalRecords function here
-            loadPersonalRecords();
-        } else {
-            resultDiv.innerHTML = `
-                <div class="alert alert-danger">
-                    ${result.message}
-                </div>
-            `;
-        }
-    })
-    .catch(error => {
-        console.error('Error regenerating personal records:', error);
-        
-        // Reset button state
-        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
-        regeneratePRsBtn.disabled = false;
-        
-        resultDiv.innerHTML = `
-            <div class="alert alert-danger">
-                An error occurred while regenerating personal records: ${error}
-            </div>
-        `;
-    });
-}
 
 /**
  * Load personal records
@@ -1349,33 +1136,217 @@ function loadPersonalRecords() {
             }
         });
 }
+
+/**
+ * Render personal records
+ */
+function renderPersonalRecords(records) {
+    const prContainer = document.getElementById('personalRecords');
+    if (!prContainer) return;
+    
+    if (!records || records.length === 0) {
+        prContainer.innerHTML = `
+            <div class="text-center py-3">
+                <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+                <p class="mb-0">No personal records available yet.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Group records by exercise and record type to find latest records
+    const latestRecords = {};
+    
+    records.forEach(record => {
+        const key = `${record.exercise_id}_${record.record_type}`;
+        
+        // If we haven't seen this exercise/record type combo yet, or if this record is newer
+        if (!latestRecords[key] || new Date(record.date) > new Date(latestRecords[key].date)) {
+            latestRecords[key] = record;
+        }
+    });
+    
+    // Convert the object of latest records back to an array
+    const latestRecordsArray = Object.values(latestRecords);
+    
+    // Group records by exercise name for display
+    const recordsByExercise = {};
+    
+    latestRecordsArray.forEach(record => {
+        if (!recordsByExercise[record.exercise_name]) {
+            recordsByExercise[record.exercise_name] = [];
+        }
+        recordsByExercise[record.exercise_name].push(record);
+    });
+    
+    let html = `
+        <div class="accordion" id="accordionPersonalRecords">
+    `;
+    
+    // Sort exercises alphabetically
+    const sortedExercises = Object.keys(recordsByExercise).sort();
+    
+    sortedExercises.forEach((exerciseName, index) => {
+        const recordsList = recordsByExercise[exerciseName];
+        const headingId = `heading${index}`;
+        const collapseId = `collapse${index}`;
+        
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="${headingId}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                        <strong>${exerciseName}</strong> <span class="badge bg-primary ms-2">${recordsList.length}</span>
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#accordionPersonalRecords">
+                    <div class="accordion-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Value</th>
+                                        <th>Date</th>
+                                        <th>Muscle Group</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+        `;
+        
+        // Sort records by date (newest first)
+        recordsList.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        recordsList.forEach(record => {
+            const recordType = formatRecordType(record.record_type);
+            const recordValue = formatRecordValue(record.record_value, record.record_type);
+            const dateStr = formatDate(record.date);
+            const isNew = !record.is_acknowledged;
+            
+            html += `
+                <tr ${isNew ? 'class="table-warning"' : ''}>
+                    <td><span class="badge bg-success">${recordType}</span> ${isNew ? '<span class="badge bg-danger ms-1">NEW</span>' : ''}</td>
+                    <td>${recordValue}</td>
+                    <td>${dateStr}</td>
+                    <td>${record.muscle_group}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+        </div>
+    `;
+    
+    prContainer.innerHTML = html;
+}
+
+/**
+ * Format record type
+ */
+function formatRecordType(type) {
+    switch (type) {
+        case 'weight':
+            return 'Weight PR';
+        case 'reps':
+            return 'Reps PR';
+        case 'volume':
+            return 'Volume PR';
+        case 'time':
+            return 'Time PR';
+        default:
+            return type;
+    }
+}
+
+/**
+ * Format record value
+ */
+function formatRecordValue(value, type) {
+    switch (type) {
+        case 'weight':
+            return `${value} kg`;
+        case 'reps':
+            return `${value} reps`;
+        case 'volume':
+            return `${value} kg (volume)`;
+        case 'time':
+            return `${value} seconds`;
+        default:
+            return value;
+    }
+}
+
+/**
+ * Format date
+ */
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Regenerate personal records
+ */
+function regeneratePersonalRecords() {
+    const resultDiv = document.getElementById('regenerateResult');
+    const regeneratePRsBtn = document.getElementById('regeneratePRsBtn');
+    
+    // Show loading indicator
+    regeneratePRsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    regeneratePRsBtn.disabled = true;
+    
+    fetch('api/personal_records.php?action=regenerate_records', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        // Reset button state
+        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
+        regeneratePRsBtn.disabled = false;
+        
+        if (result.success) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    ${result.message}
+                </div>
+            `;
+            
+            // Reload the personal records
+            loadPersonalRecords();
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    ${result.message}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error regenerating personal records:', error);
+        
+        // Reset button state
+        regeneratePRsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Personal Records';
+        regeneratePRsBtn.disabled = false;
+        
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                An error occurred while regenerating personal records: ${error}
+            </div>
+        `;
+    });
+}
 </script>
-
-<style>
-/* Add styles for stats cards */
-.stat-card {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 5px;
-    text-align: center;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-.stat-card h3 {
-    font-size: 2rem;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.stat-card p {
-    color: #6c757d;
-    margin-bottom: 0;
-}
-
-.stats-row {
-    margin-bottom: 20px;
-}
-</style>
 
 <?php require_once 'includes/footer.php'; ?>
