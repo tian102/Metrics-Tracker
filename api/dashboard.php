@@ -955,115 +955,55 @@ function getPersonalRecords($userId) {
 function getActivityHeatmap($userId, $startDate, $endDate) {
     $db = new Database();
     
-    // Get training activity
-    $db->query("SELECT t.date, 
-                COUNT(*) AS session_count,
-                SUM(TIMESTAMPDIFF(MINUTE, t.training_start, t.training_end)) AS total_duration,
-                (SELECT COUNT(*) FROM workout_details w WHERE w.session_id = t.id) AS exercise_count
-                FROM training_sessions t
-                WHERE t.user_id = :user_id 
-                AND t.date BETWEEN :start_date AND :end_date
-                AND t.training_start IS NOT NULL 
-                AND t.training_end IS NOT NULL
-                GROUP BY t.date");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':start_date', $startDate);
-    $db->bind(':end_date', $endDate);
-    
-    $trainingActivity = $db->resultSet();
-    $trainingByDate = [];
-    
-    foreach ($trainingActivity as $activity) {
-        $trainingByDate[$activity['date']] = [
-            'session_count' => $activity['session_count'],
-            'total_duration' => $activity['total_duration'],
-            'exercise_count' => $activity['exercise_count']
-        ];
+    // Query to get daily training activity totals
+    // Using proper table and column names based on your schema
+    try {
+        $db->query("
+            SELECT 
+                DATE(ts.date) AS date,
+                IFNULL(SUM(wd.load_weight * wd.reps * wd.sets), 0) AS total_volume,
+                COUNT(DISTINCT wd.id) AS exercise_count,
+                COUNT(DISTINCT ts.id) AS session_count
+            FROM 
+                training_sessions ts
+            LEFT JOIN 
+                workout_details wd ON ts.id = wd.session_id
+            WHERE 
+                ts.user_id = :user_id 
+                AND ts.date BETWEEN :start_date AND :end_date
+            GROUP BY 
+                DATE(ts.date)
+            ORDER BY 
+                date
+        ");
+        
+        $db->bind(':user_id', $userId);
+        $db->bind(':start_date', $startDate);
+        $db->bind(':end_date', $endDate);
+        $data = $db->resultSet();
+        
+        echo json_encode([
+            'success' => true,
+            'data' => $data,
+            'date_range' => [
+                'start' => $startDate,
+                'end' => $endDate,
+                'days' => dateDiffDays($startDate, $endDate)
+            ]
+        ]);
+    } catch (Exception $e) {
+        error_log("Database error in getActivityHeatmap: " . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database error when fetching activity data: ' . $e->getMessage(),
+            'data' => [],
+            'date_range' => [
+                'start' => $startDate,
+                'end' => $endDate,
+                'days' => dateDiffDays($startDate, $endDate)
+            ]
+        ]);
     }
-    
-    // Get daily metrics activity
-    $db->query("SELECT date, 
-                CASE WHEN sleep_start IS NOT NULL AND sleep_end IS NOT NULL THEN 1 ELSE 0 END AS has_sleep,
-                CASE WHEN energy_level IS NOT NULL THEN 1 ELSE 0 END AS has_energy,
-                CASE WHEN weight IS NOT NULL THEN 1 ELSE 0 END AS has_weight,
-                CASE WHEN calories IS NOT NULL THEN 1 ELSE 0 END AS has_nutrition
-                FROM daily_metrics 
-                WHERE user_id = :user_id 
-                AND date BETWEEN :start_date AND :end_date");
-    
-    $db->bind(':user_id', $userId);
-    $db->bind(':start_date', $startDate);
-    $db->bind(':end_date', $endDate);
-    
-    $dailyActivity = $db->resultSet();
-    $dailyByDate = [];
-    
-    foreach ($dailyActivity as $activity) {
-        $dailyByDate[$activity['date']] = [
-            'has_sleep' => $activity['has_sleep'],
-            'has_energy' => $activity['has_energy'],
-            'has_weight' => $activity['has_weight'],
-            'has_nutrition' => $activity['has_nutrition']
-        ];
-    }
-    
-    // Combine data for each date in the range
-    $heatmapData = [];
-    $current = new DateTime($startDate);
-    $end = new DateTime($endDate);
-    $end->modify('+1 day');
-    
-    while ($current < $end) {
-        $date = $current->format('Y-m-d');
-        $hasTraining = isset($trainingByDate[$date]);
-        $hasDaily = isset($dailyByDate[$date]);
-        
-        $activityLevel = 0;
-        
-        if ($hasTraining) {
-            // Training is weighted more heavily in activity level
-            $activityLevel += 2;
-            
-            // Add extra weight for longer sessions or more exercises
-            if ($trainingByDate[$date]['total_duration'] > 60) {
-                $activityLevel += 1;
-            }
-            
-            if ($trainingByDate[$date]['exercise_count'] > 5) {
-                $activityLevel += 1;
-            }
-        }
-        
-        if ($hasDaily) {
-            // Each tracked daily metric adds a bit to activity level
-            if ($dailyByDate[$date]['has_sleep']) $activityLevel += 0.5;
-            if ($dailyByDate[$date]['has_energy']) $activityLevel += 0.5;
-            if ($dailyByDate[$date]['has_weight']) $activityLevel += 0.5;
-            if ($dailyByDate[$date]['has_nutrition']) $activityLevel += 0.5;
-        }
-        
-        $heatmapData[] = [
-            'date' => $date,
-            'activity_level' => $activityLevel,
-            'has_training' => $hasTraining,
-            'has_daily' => $hasDaily,
-            'training_data' => $hasTraining ? $trainingByDate[$date] : null,
-            'daily_data' => $hasDaily ? $dailyByDate[$date] : null
-        ];
-        
-        $current->modify('+1 day');
-    }
-    
-    echo json_encode([
-        'success' => true,
-        'data' => $heatmapData,
-        'date_range' => [
-            'start' => $startDate,
-            'end' => $endDate,
-            'days' => dateDiffDays($startDate, $endDate)
-        ]
-    ]);
 }
 
 /**

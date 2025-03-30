@@ -233,86 +233,257 @@ function loadWidgetContent(widgetId, widgetType, startDate, endDate) {
 }
 
 /**
- * Load recent daily metrics data from API
+ * Render activity heatmap widget
+ * @param {HTMLElement} element Widget element
+ * @param {Array} data Activity data
+ * @param {Object} dateRange Date range information
  */
-function loadRecentMetrics() {
-    const endDate = new Date();
-    let startDate = new Date();
-    startDate.setDate(startDate.getDate() - 14); // Get the last 14 days
+function renderActivityHeatmap(element, data, dateRange) {
+    if (!data || data.length === 0) {
+        element.innerHTML = `
+            <div class="text-center py-3">
+                <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                <p class="mb-0">No training data available for this period.</p>
+            </div>
+        `;
+        return;
+    }
     
-    const startDateString = startDate.toISOString().split('T')[0];
-    const endDateString = endDate.toISOString().split('T')[0];
+    // Create a map of dates to make data lookup easier
+    const dateMap = {};
+    data.forEach(day => {
+        // Make sure all properties exist and have default values
+        day.total_volume = parseFloat(day.total_volume) || 0;
+        day.exercise_count = parseInt(day.exercise_count) || 0;
+        day.session_count = parseInt(day.session_count) || 0;
+        
+        // Store in map for easier lookup
+        dateMap[day.date] = day;
+    });
     
-    fetch(`api/dashboard.php?action=get_data&widget_type=recent_daily&start_date=${startDateString}&end_date=${endDateString}`)
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                const recentMetricsContainer = document.getElementById('recentMetricsContainer');
-                if (recentMetricsContainer) {
-                    renderRecentMetrics(result.data, result.date_range);
-                }
-            } else {
-                console.error('Failed to load recent metrics:', result.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading recent metrics:', error);
-        });
-}
-
-/**
- * Load recent training sessions data from API
- */
-function loadRecentSessions() {
-    const endDate = new Date();
-    let startDate = new Date();
-    startDate.setDate(startDate.getDate() - 14); // Get the last 14 days
+    // Group data by week and day
+    const weeks = {};
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
-    const startDateString = startDate.toISOString().split('T')[0];
-    const endDateString = endDate.toISOString().split('T')[0];
+    // Generate dates for the entire period to ensure all days are included
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    let currentDate = new Date(startDate);
     
-    fetch(`api/dashboard.php?action=get_data&widget_type=recent_training&start_date=${startDateString}&end_date=${endDateString}`)
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                const recentSessionsContainer = document.getElementById('recentSessionsContainer');
-                if (recentSessionsContainer) {
-                    renderRecentSessions(result.data);
-                }
-                
-                // Also update any Recent Training widget on the dashboard
-                document.querySelectorAll('.widget-content[data-widget-type="recent_training"]').forEach(widget => {
-                    renderRecentTrainingSessions(widget, result.data, result.date_range);
-                });
-            } else {
-                console.error('Failed to load recent sessions:', result.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading recent sessions:', error);
-        });
-}
-
-/**
- * Load all dashboard widget data
- */
-function loadWidgetData() {
-    // Find all widgets on the dashboard
-    const widgets = document.querySelectorAll('.widget-content');
-    
-    widgets.forEach(widget => {
-        const widgetType = widget.getAttribute('data-widget-type');
-        if (widgetType) {
-            // Refresh the specific widget data based on its type
-            if (widgetType === 'recent_daily') {
-                loadRecentMetrics();
-            } else if (widgetType === 'recent_training') {
-                loadRecentSessions();
-            }
-            // Add other widget types if needed
+    while (currentDate <= endDate) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+        
+        // Calculate week number
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(currentDate.getDate() - dayOfWeek);
+        const weekKey = weekStart.toISOString().substring(0, 10);
+        
+        if (!weeks[weekKey]) {
+            weeks[weekKey] = Array(7).fill(null);
         }
+        
+        // Get data for this date or use default values
+        let dayData = dateMap[dateStr] || {
+            date: dateStr,
+            total_volume: 0,
+            exercise_count: 0,
+            session_count: 0
+        };
+        
+        // Calculate volume level (0-3) based on total exercise volume
+        let volumeLevel = 0;
+        if (dayData.total_volume > 0) {
+            // Determine intensity level based on volume thresholds
+            if (dayData.total_volume > 10000) {
+                volumeLevel = 3; // High volume
+            } else if (dayData.total_volume > 5000) {
+                volumeLevel = 2; // Medium volume
+            } else {
+                volumeLevel = 1; // Low volume
+            }
+        }
+        
+        weeks[weekKey][dayOfWeek] = {
+            date: dateStr,
+            level: volumeLevel,
+            totalVolume: dayData.total_volume,
+            exerciseCount: dayData.exercise_count,
+            sessionCount: dayData.session_count
+        };
+        
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Sort weeks by date
+    const sortedWeeks = Object.keys(weeks).sort();
+    
+    // Create heatmap table
+    let html = `
+        <div class="heatmap-container">
+            <table class="heatmap-table">
+                <thead>
+                    <tr>
+                        ${daysOfWeek.map(day => `<th>${day}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    sortedWeeks.forEach(week => {
+        html += '<tr>';
+        
+        weeks[week].forEach(day => {
+            if (day === null) {
+                html += '<td class="empty-day"></td>';
+            } else {
+                const levelClass = getHeatmapColorClass(day.level);
+                const formattedVolume = day.totalVolume.toLocaleString();
+                
+                const tooltip = `
+                    Date: ${formatDate(day.date)}<br>
+                    Volume: ${formattedVolume} kg<br>
+                    Exercises: ${day.exerciseCount}<br>
+                    Sessions: ${day.sessionCount}
+                `;
+                
+                html += `
+                    <td class="heatmap-day ${levelClass}" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-html="true"
+                        data-bs-placement="top" 
+                        title="${tooltip}">
+                        <span class="day-number">${new Date(day.date).getDate()}</span>
+                    </td>
+                `;
+            }
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += `
+                </tbody>
+            </table>
+            
+            <div class="heatmap-legend mt-3 d-flex justify-content-center">
+                <div class="d-flex align-items-center me-3">
+                    <span class="heatmap-legend-color heatmap-level-0 me-1"></span>
+                    <small>No Volume</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <span class="heatmap-legend-color heatmap-level-1 me-1"></span>
+                    <small>< 5,000 kg</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <span class="heatmap-legend-color heatmap-level-2 me-1"></span>
+                    <small>5,000-10,000 kg</small>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="heatmap-legend-color heatmap-level-3 me-1"></span>
+                    <small>10,000+ kg</small>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    element.innerHTML = html;
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(element.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 }
+
+/**
+ * Get color class for heatmap based on activity level
+ * @param {number} level Activity level
+ * @returns {string} CSS class for the color
+ */
+function getHeatmapColorClass(level) {
+    if (level >= 3) {
+        return 'heatmap-level-3';
+    } else if (level >= 2) {
+        return 'heatmap-level-2';
+    } else if (level > 0) {
+        return 'heatmap-level-1';
+    } else {
+        return 'heatmap-level-0';
+    }
+}
+
+/**
+ * Format a date for display
+ * @param {string} dateString Date string in YYYY-MM-DD format
+ * @returns {string} Formatted date (e.g., "Jan 1, 2023")
+ */
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Add CSS for the heatmap
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+    .heatmap-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 2px;
+    }
+    
+    .heatmap-table th {
+        text-align: center;
+        font-size: 0.8rem;
+    }
+    
+    .heatmap-day {
+        width: 30px;
+        height: 30px;
+        text-align: center;
+        font-size: 0.8rem;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    
+    .empty-day {
+        background-color: transparent;
+    }
+    
+    .heatmap-level-0 {
+        background-color: #ebedf0;
+    }
+    
+    .heatmap-level-1 {
+        background-color: #9be9a8;
+    }
+    
+    .heatmap-level-2 {
+        background-color: #40c463;
+    }
+    
+    .heatmap-level-3 {
+        background-color: #216e39;
+        color: white;
+    }
+    
+    .heatmap-legend-color {
+        display: inline-block;
+        width: 15px;
+        height: 15px;
+        border-radius: 3px;
+    }
+    
+    .day-number {
+        display: inline-block;
+        width: 100%;
+        height: 100%;
+        line-height: 30px;
+    }
+</style>
+`);
 
 /**
  * Render sleep statistics widget
@@ -811,7 +982,7 @@ function renderRecentDailyMetrics(element, data, dateRange) {
     element.innerHTML = html;
 
     // Add event listeners for delete buttons
-    document.querySelectorAll('.delete-metric').forEach(button => {
+    element.querySelectorAll('.delete-metric').forEach(button => {
         button.addEventListener('click', function(event) {
             event.preventDefault();
             const metricId = this.getAttribute('data-id');
@@ -961,126 +1132,6 @@ function renderPersonalRecords(element, data) {
 }
 
 /**
- * Render activity heatmap widget
- * @param {HTMLElement} element Widget element
- * @param {Array} data Activity data
- * @param {Object} dateRange Date range information
- */
-function renderActivityHeatmap(element, data, dateRange) {
-    if (!data || data.length === 0) {
-        element.innerHTML = `
-            <div class="text-center py-3">
-                <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
-                <p class="mb-0">No activity data available for this period.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Group data by week and day
-    const weeks = {};
-    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    data.forEach(day => {
-        const date = new Date(day.date);
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-        
-        // Calculate week number (approximate)
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - dayOfWeek);
-        const weekKey = weekStart.toISOString().substring(0, 10);
-        
-        if (!weeks[weekKey]) {
-            weeks[weekKey] = Array(7).fill(null);
-        }
-        
-        weeks[weekKey][dayOfWeek] = {
-            date: day.date,
-            level: day.activity_level,
-            hasTraining: day.has_training,
-            hasDaily: day.has_daily
-        };
-    });
-    
-    // Sort weeks by date
-    const sortedWeeks = Object.keys(weeks).sort();
-    
-    // Create heatmap table
-    let html = `
-        <div class="heatmap-container">
-            <table class="heatmap-table">
-                <thead>
-                    <tr>
-                        ${daysOfWeek.map(day => `<th>${day}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    sortedWeeks.forEach(week => {
-        html += '<tr>';
-        
-        weeks[week].forEach(day => {
-            if (day === null) {
-                html += '<td class="empty-day"></td>';
-            } else {
-                const levelClass = getHeatmapColorClass(day.level);
-                const tooltip = `
-                    Date: ${formatDate(day.date)}<br>
-                    ${day.hasTraining ? '✓ Training' : '✗ No Training'}<br>
-                    ${day.hasDaily ? '✓ Daily Metrics' : '✗ No Daily Metrics'}
-                `;
-                
-                html += `
-                    <td class="heatmap-day ${levelClass}" 
-                        data-bs-toggle="tooltip" 
-                        data-bs-html="true"
-                        data-bs-placement="top" 
-                        title="${tooltip}">
-                        <span class="day-number">${new Date(day.date).getDate()}</span>
-                    </td>
-                `;
-            }
-        });
-        
-        html += '</tr>';
-    });
-    
-    html += `
-                </tbody>
-            </table>
-            
-            <div class="heatmap-legend mt-3 d-flex justify-content-center">
-                <div class="d-flex align-items-center me-3">
-                    <span class="heatmap-legend-color heatmap-level-0 me-1"></span>
-                    <small>None</small>
-                </div>
-                <div class="d-flex align-items-center me-3">
-                    <span class="heatmap-legend-color heatmap-level-1 me-1"></span>
-                    <small>Low</small>
-                </div>
-                <div class="d-flex align-items-center me-3">
-                    <span class="heatmap-legend-color heatmap-level-2 me-1"></span>
-                    <small>Medium</small>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="heatmap-legend-color heatmap-level-3 me-1"></span>
-                    <small>High</small>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    element.innerHTML = html;
-    
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(element.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-}
-
-/**
  * Render recent insights widget
  * @param {HTMLElement} element Widget element
  * @param {Array} data Insights data
@@ -1128,271 +1179,6 @@ function renderRecentInsights(element, data) {
 }
 
 /**
- * Load personal records for the PR modal
- */
-function loadPersonalRecords() {
-    const prList = document.getElementById('prList');
-    
-    // Show loading state
-    prList.innerHTML = `
-        <div class="text-center py-3">
-            <div class="spinner-border text-warning" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    `;
-    
-    // Load unacknowledged PRs
-    fetch('api/personal_records.php?action=get_records')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(result => {
-            if (result.success) {
-                renderPRList(result.data);
-                
-                // Set up event listener for the "Acknowledge All" button
-                document.getElementById('acknowledgeAllBtn').addEventListener('click', function() {
-                    acknowledgeAllPRs(result.data);
-                });
-            } else {
-                prList.innerHTML = `
-                    <div class="alert alert-danger">
-                        <p>Failed to load personal records: ${result.message}</p>
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            prList.innerHTML = `
-                <div class="alert alert-danger">
-                    <p>Error loading personal records. Please try again later.</p>
-                </div>
-            `;
-        });
-}
-
-/**
- * Render the list of personal records in the PR modal
- * @param {Array} records Personal records data
- */
-function renderPRList(records) {
-    const prList = document.getElementById('prList');
-    
-    // Filter for unacknowledged PRs
-    const unacknowledgedPRs = records.filter(record => !record.is_acknowledged);
-    
-    if (unacknowledgedPRs.length === 0) {
-        prList.innerHTML = `
-            <div class="alert alert-info">
-                <p>No new personal records to acknowledge.</p>
-            </div>
-        `;
-        document.getElementById('acknowledgeAllBtn').style.display = 'none';
-        return;
-    }
-    
-    let html = '';
-    
-    unacknowledgedPRs.forEach(record => {
-        const recordType = formatRecordType(record.record_type);
-        const recordValue = formatRecordValue(record.record_value, record.record_type);
-        const dateStr = formatDate(record.date);
-        
-        html += `
-            <div class="list-group-item list-group-item-warning" data-record-id="${record.id}">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">${record.exercise_name}</h5>
-                    <small>${dateStr}</small>
-                </div>
-                <p class="mb-1">
-                    <span class="badge bg-success">${recordType}</span>
-                    ${recordValue}
-                </p>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small>${record.muscle_group} | ${record.equipment}</small>
-                    <button class="btn btn-sm btn-outline-success acknowledge-pr-btn" data-record-id="${record.id}">
-                        <i class="fas fa-check"></i> Acknowledge
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-    
-    prList.innerHTML = html;
-    
-    // Add event listeners to acknowledge buttons
-    document.querySelectorAll('.acknowledge-pr-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const recordId = this.getAttribute('data-record-id');
-            acknowledgePR(recordId);
-        });
-    });
-}
-
-/**
- * Acknowledge a personal record
- * @param {string} recordId Personal record ID
- */
-function acknowledgePR(recordId) {
-    fetch('api/personal_records.php?action=acknowledge', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ record_id: recordId })
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            // Remove the item from the list
-            const item = document.querySelector(`.list-group-item[data-record-id="${recordId}"]`);
-            if (item) {
-                item.classList.remove('list-group-item-warning');
-                item.classList.add('list-group-item-success');
-                
-                // Replace the acknowledge button with a success message
-                const btnContainer = item.querySelector('.acknowledge-pr-btn').parentNode;
-                btnContainer.innerHTML = '<span class="text-success"><i class="fas fa-check"></i> Acknowledged</span>';
-            }
-            
-            // Check if any PRs remain
-            const remainingPRs = document.querySelectorAll('.list-group-item-warning');
-            if (remainingPRs.length === 0) {
-                document.getElementById('acknowledgeAllBtn').style.display = 'none';
-            }
-            
-            // Update PR count in UI
-            updatePRCount();
-        } else {
-            alert('Failed to acknowledge record: ' + result.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error acknowledging record. Please try again.');
-    });
-}
-
-/**
- * Acknowledge all personal records
- * @param {Array} records Personal records data
- */
-function acknowledgeAllPRs(records) {
-    const unacknowledgedPRs = records.filter(record => !record.is_acknowledged);
-    
-    if (unacknowledgedPRs.length === 0) {
-        return;
-    }
-    
-    // Show loading state
-    const acknowledgeAllBtn = document.getElementById('acknowledgeAllBtn');
-    acknowledgeAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    acknowledgeAllBtn.disabled = true;
-    
-    // Create promises for all acknowledgements
-    const promises = unacknowledgedPRs.map(record => {
-        return fetch('api/personal_records.php?action=acknowledge', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ record_id: record.id })
-        }).then(response => response.json());
-    });
-    
-    // Wait for all promises to resolve
-    Promise.all(promises)
-        .then(results => {
-            // Check if all were successful
-            const allSuccess = results.every(result => result.success);
-            
-            if (allSuccess) {
-                // Update UI to show all PRs as acknowledged
-                document.querySelectorAll('.list-group-item').forEach(item => {
-                    item.classList.remove('list-group-item-warning');
-                    item.classList.add('list-group-item-success');
-                    
-                    // Replace the acknowledge button with a success message
-                    const btnContainer = item.querySelector('.acknowledge-pr-btn')?.parentNode;
-                    if (btnContainer) {
-                        btnContainer.innerHTML = '<span class="text-success"><i class="fas fa-check"></i> Acknowledged</span>';
-                    }
-                });
-                
-                // Hide the acknowledge all button
-                acknowledgeAllBtn.style.display = 'none';
-                
-                // Update PR count in UI
-                updatePRCount();
-            } else {
-                // Show error message
-                alert('Some records could not be acknowledged. Please try again.');
-                
-                // Reset button state
-                acknowledgeAllBtn.innerHTML = '<i class="fas fa-check"></i> Acknowledge All';
-                acknowledgeAllBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error acknowledging records. Please try again.');
-            
-            // Reset button state
-            acknowledgeAllBtn.innerHTML = '<i class="fas fa-check"></i> Acknowledge All';
-            acknowledgeAllBtn.disabled = false;
-        });
-}
-
-/**
- * Update the PR count in the UI
- */
-function updatePRCount() {
-    fetch('api/personal_records.php?action=unacknowledged')
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                const count = result.count;
-                
-                // Update the PR badge or hide the button if no PRs remain
-                const prBtn = document.getElementById('viewPRsBtn');
-                if (prBtn) {
-                    if (count > 0) {
-                        const badge = prBtn.querySelector('.badge');
-                        badge.textContent = count;
-                    } else {
-                        prBtn.style.display = 'none';
-                    }
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-}
-
-/**
- * Get color class for heatmap based on activity level
- * @param {number} level Activity level
- * @returns {string} CSS class for the color
- */
-function getHeatmapColorClass(level) {
-    if (level >= 3) {
-        return 'heatmap-level-3';
-    } else if (level >= 2) {
-        return 'heatmap-level-2';
-    } else if (level > 0) {
-        return 'heatmap-level-1';
-    } else {
-        return 'heatmap-level-0';
-    }
-}
-
-/**
  * Format a record type for display
  * @param {string} type Record type
  * @returns {string} Formatted record type
@@ -1434,16 +1220,6 @@ function formatRecordValue(value, type) {
 }
 
 /**
- * Format a date for display
- * @param {string} dateString Date string in YYYY-MM-DD format
- * @returns {string} Formatted date (e.g., "Jan 1, 2023")
- */
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-/**
  * Get CSS class for correlation strength
  * @param {number} correlation Correlation coefficient
  * @param {string} strength Correlation strength
@@ -1482,198 +1258,6 @@ function getMetricName(metricId) {
     };
     
     return metricNames[metricId] || metricId;
-}
-
-// Handle window resize events to redraw charts
-window.addEventListener('resize', function() {
-    // Get all chart canvases
-    const chartCanvases = document.querySelectorAll('.chart-container canvas');
-    
-    // If there are any charts rendered, give them a moment to adjust
-    if (chartCanvases.length > 0) {
-        // Add a small delay to let the DOM update
-        setTimeout(function() {
-            // Force Chart.js to resize all charts
-            chartCanvases.forEach(canvas => {
-                if (canvas.chart) {
-                    canvas.chart.resize();
-                }
-            });
-        }, 100);
-    }
-});
-
-// Add CSS for the heatmap
-document.head.insertAdjacentHTML('beforeend', `
-<style>
-    .heatmap-table {
-        width: 100%;
-        table-layout: fixed;
-        border-collapse: separate;
-        border-spacing: 2px;
-    }
-    
-    .heatmap-table th {
-        text-align: center;
-        font-size: 0.8rem;
-    }
-    
-    .heatmap-day {
-        width: 30px;
-        height: 30px;
-        text-align: center;
-        font-size: 0.8rem;
-        border-radius: 3px;
-        cursor: pointer;
-    }
-    
-    .empty-day {
-        background-color: transparent;
-    }
-    
-    .heatmap-level-0 {
-        background-color: #ebedf0;
-    }
-    
-    .heatmap-level-1 {
-        background-color: #9be9a8;
-    }
-    
-    .heatmap-level-2 {
-        background-color: #40c463;
-    }
-    
-    .heatmap-level-3 {
-        background-color: #216e39;
-        color: white;
-    }
-    
-    .heatmap-legend-color {
-        display: inline-block;
-        width: 15px;
-        height: 15px;
-        border-radius: 3px;
-    }
-    
-    .day-number {
-        display: inline-block;
-        width: 100%;
-        height: 100%;
-        line-height: 30px;
-    }
-</style>
-`);
-
-/**
- * Renders recent daily metrics entries
- * @param {Array} metrics The metrics data
- */
-function renderRecentMetrics(metrics) {
-    const container = document.getElementById('recentMetricsContainer');
-    if (!container) return;
-    
-    if (!metrics || metrics.length === 0) {
-        container.innerHTML = '<p class="text-muted">No daily metrics entries found.</p>';
-        return;
-    }
-    
-    let html = '<div class="list-group">';
-    
-    metrics.forEach(metric => {
-        const date = new Date(metric.date);
-        const formattedDate = date.toLocaleDateString();
-        
-        html += `
-        <div class="list-group-item list-group-item-action">
-            <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">${formattedDate}</h5>
-                <div class="d-flex">
-                    <a href="daily_metrics.php?id=${metric.id}" class="btn btn-sm btn-outline-primary me-1">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <button type="button" class="btn btn-sm btn-outline-danger delete-metric" data-id="${metric.id}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="d-flex justify-content-between metrics-summary">
-                <span title="Weight"><i class="fas fa-weight"></i> ${metric.weight || '-'} ${metric.weight_unit || 'kg'}</span>
-                <span title="Sleep Quality"><i class="fas fa-bed"></i> ${metric.sleep_quality || '-'}/10</span>
-                <span title="Energy Level"><i class="fas fa-bolt"></i> ${metric.energy_level || '-'}/10</span>
-                <span title="Stress Level"><i class="fas fa-brain"></i> ${metric.stress_level || '-'}/10</span>
-            </div>
-        </div>`;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-    
-    // Add event listeners for delete buttons
-    document.querySelectorAll('.delete-metric').forEach(button => {
-        button.addEventListener('click', function(event) {
-            event.preventDefault();
-            const metricId = this.getAttribute('data-id');
-            
-            if (confirm('Are you sure you want to delete this daily metrics entry? This action cannot be undone.')) {
-                deleteMetricsEntry(metricId);
-            }
-        });
-    });
-}
-
-/**
- * Renders recent training sessions
- * @param {Array} sessions The training sessions data
- */
-function renderRecentSessions(sessions) {
-    const container = document.getElementById('recentSessionsContainer');
-    if (!container) return;
-    
-    if (!sessions || sessions.length === 0) {
-        container.innerHTML = '<p class="text-muted">No training sessions found.</p>';
-        return;
-    }
-    
-    let html = '<div class="list-group">';
-    
-    sessions.forEach(session => {
-        const date = new Date(session.date);
-        const formattedDate = date.toLocaleDateString();
-        
-        html += `
-        <div class="list-group-item list-group-item-action">
-            <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">${session.name || 'Training Session'}</h5>
-                <div class="d-flex">
-                    <a href="training.php?id=${session.id}" class="btn btn-sm btn-outline-primary me-1">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <button type="button" class="btn btn-sm btn-outline-danger delete-session" data-id="${session.id}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            <p class="mb-1">
-                <span title="Date"><i class="far fa-calendar-alt"></i> ${formattedDate}</span>
-                ${session.duration ? `<span title="Duration" class="ms-3"><i class="far fa-clock"></i> ${session.duration} min</span>` : ''}
-                ${session.rpe ? `<span title="RPE" class="ms-3"><i class="fas fa-tachometer-alt"></i> RPE: ${session.rpe}/10</span>` : ''}
-            </p>
-        </div>`;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-    
-    // Add event listeners for delete buttons
-    document.querySelectorAll('.delete-session').forEach(button => {
-        button.addEventListener('click', function(event) {
-            event.preventDefault();
-            const sessionId = this.getAttribute('data-id');
-            
-            // Pass session ID directly to deleteTrainingSession without showing confirmation dialog here
-            deleteTrainingSession(sessionId, true); // Added true parameter to indicate we need confirmation
-        });
-    });
 }
 
 /**
