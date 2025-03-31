@@ -9,8 +9,8 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#ffffff">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-status-bar-style" content="default">
     <title><?php echo APP_NAME; ?><?php echo isset($pageTitle) ? ' - ' . $pageTitle : ''; ?></title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -61,6 +61,11 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                         <li><a class="dropdown-item" href="daily.php"><i class="fas fa-heartbeat"></i> Health</a></li>
                                         <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell"></i> Training</a></li>
                                     </ul>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'workout_templates.php') ? 'active' : ''; ?>" href="workout_templates.php">
+                                        <i class="fas fa-clipboard-list"></i> Workout Templates
+                                    </a>
                                 </li>
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="#" id="dataDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

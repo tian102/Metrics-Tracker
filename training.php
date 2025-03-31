@@ -257,11 +257,18 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                     <p>No exercises added yet. Add your first exercise below.</p>
                 <?php endif; ?>
                 
-                <!-- New Exercise Form -->
-                <button type="button" id="addExerciseBtn" class="btn btn-secondary add-exercise-btn">
-                    <i class="fas fa-plus"></i> Add Exercise
-                </button>
+                <!-- Exercise Actions -->
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button type="button" id="addExerciseBtn" class="btn btn-secondary">
+                        <i class="fas fa-plus"></i> Add Exercise
+                    </button>
+                    
+                    <button type="button" id="loadTemplateBtn" class="btn btn-primary">
+                        <i class="fas fa-dumbbell"></i> Load Template
+                    </button>
+                </div>
                 
+                <!-- New Exercise Form -->
                 <div id="newExerciseForm" style="display: none;" class="exercise-container mt-3">
                     <h4>New Exercise</h4>
                     <form id="workoutDetailsForm">
@@ -372,6 +379,34 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Template selection modal -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Workout Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Select a workout template to automatically add its exercises to your training session.</p>
+                <div id="templatesList">
+                    <!-- Templates will be loaded here -->
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading templates...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="workout_templates.php" class="btn btn-primary">Manage Templates</a>
+            </div>
+        </div>
     </div>
 </div>
 

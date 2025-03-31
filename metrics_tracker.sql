@@ -1047,6 +1047,48 @@ INSERT INTO `workout_details` (`id`, `session_id`, `muscle_group`, `exercise_nam
 (16, 9, 'Shoulders', 'Shoulder Press', 'Unknown', 6, 1, 3, 6, 22, 2, 3, 7, '2025-03-14 18:34:48', '2025-03-14 18:55:27'),
 (17, 10, 'Glutes', 'Split squat', 'Unknown', 9, 2, 3, 10, 50, 2, 8, 3, '2025-03-14 18:49:43', '2025-03-14 18:55:27');
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `workout_templates`
+--
+
+CREATE TABLE `workout_templates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` text,
+  `is_favorite` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `workout_templates_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `workout_template_exercises`
+--
+
+CREATE TABLE `workout_template_exercises` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `muscle_group` varchar(50) NOT NULL,
+  `exercise_name` varchar(100) NOT NULL,
+  `equipment` varchar(100) NOT NULL,
+  `default_sets` int(11) DEFAULT NULL,
+  `default_reps` int(11) DEFAULT NULL,
+  `default_weight` float DEFAULT NULL,
+  `default_rir` int(11) DEFAULT NULL,
+  `order_position` int(11) NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `template_id` (`template_id`),
+  CONSTRAINT `workout_template_exercises_ibfk_1` FOREIGN KEY (`template_id`) REFERENCES `workout_templates` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 --
 -- Indexes for dumped tables
 --
@@ -1152,6 +1194,20 @@ ALTER TABLE `workout_details`
   ADD KEY `idx_workout_details_session` (`session_id`);
 
 --
+-- Indexes for table `workout_templates`
+--
+ALTER TABLE `workout_templates`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `workout_template_exercises`
+--
+ALTER TABLE `workout_template_exercises`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `template_id` (`template_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -1234,6 +1290,18 @@ ALTER TABLE `workout_details`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
+-- AUTO_INCREMENT for table `workout_templates`
+--
+ALTER TABLE `workout_templates`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `workout_template_exercises`
+--
+ALTER TABLE `workout_template_exercises`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- Constraints for dumped tables
 --
 
@@ -1300,6 +1368,18 @@ ALTER TABLE `user_exercise_history`
 --
 ALTER TABLE `workout_details`
   ADD CONSTRAINT `workout_details_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `training_sessions` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `workout_templates`
+--
+ALTER TABLE `workout_templates`
+  ADD CONSTRAINT `workout_templates_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `workout_template_exercises`
+--
+ALTER TABLE `workout_template_exercises`
+  ADD CONSTRAINT `workout_template_exercises_ibfk_1` FOREIGN KEY (`template_id`) REFERENCES `workout_templates` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
