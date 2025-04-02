@@ -10,9 +10,90 @@ document.addEventListener('DOMContentLoaded', function() {
         equipment: [],
         exercises: []
     };
-
+    
+    // Cache for API responses to reduce duplicate calls
+    const apiCache = new Map();
+    
     // Initialize the page
     initializePage();
+
+    /**
+     * Debounce function to limit how often a function can be called
+     * @param {Function} func - The function to debounce
+     * @param {number} wait - The debounce delay in milliseconds
+     * @returns {Function} - Debounced function
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+    }
+
+    /**
+     * Display a toast notification
+     * @param {string} type - Alert type (success, danger, warning, info)
+     * @param {string} message - Message to display
+     * @param {number} duration - Time in ms to show the toast (default: 3000)
+     */
+    function showToast(type, message, duration = 3000) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create unique ID for this toast
+        const toastId = 'toast-' + new Date().getTime();
+        
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast show border-${type}`;
+        toast.id = toastId;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        // Add content to toast
+        toast.innerHTML = `
+            <div class="toast-header bg-${type} text-white">
+                <strong class="me-auto">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                    ${type === 'success' ? 'Success' : type === 'danger' ? 'Error' : 'Notice'}
+                </strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+        
+        // Add to container
+        toastContainer.appendChild(toast);
+        
+        // Close button handler
+        const closeBtn = toast.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                toast.remove();
+            });
+        }
+        
+        // Auto-remove after duration
+        setTimeout(() => {
+            const toastElement = document.getElementById(toastId);
+            if (toastElement) {
+                // Add fade-out effect
+                toastElement.classList.add('fade-out');
+                setTimeout(() => toastElement.remove(), 500);
+            }
+        }, duration);
+    }
 
     /**
      * Main initialization function
@@ -32,6 +113,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 hasRecentSessions: !!recentSessions
             });
             
+            // Add CSS for toast animations
+            addStylesForToasts();
+            
             // Load exercise data from API with better error handling
             loadExerciseData()
                 .then(() => {
@@ -50,19 +134,202 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .catch(error => {
                     console.error('Error loading exercise data:', error);
-                    showErrorMessage('Failed to load exercise data. Please refresh the page or try again later.');
+                    showToast('danger', 'Failed to load exercise data. Please refresh the page.');
                 });
         } catch (error) {
             console.error('Error during initialization:', error);
-            showErrorMessage('An error occurred while initializing the page. Please refresh or contact support.');
+            showToast('danger', 'An error occurred while initializing the page.');
         }
     }
 
     /**
-     * Load exercise data with better error handling
+     * Add styles for toasts and animations
+     */
+    function addStylesForToasts() {
+        const styleEl = document.createElement('style');
+        styleEl.textContent = `
+            .toast-container {
+                z-index: 1050;
+            }
+            .toast {
+                transition: opacity 0.5s ease-out;
+            }
+            .toast.fade-out {
+                opacity: 0;
+            }
+            .loading-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(255, 255, 255, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10;
+                border-radius: 0.25rem;
+            }
+            .form-select.loading {
+                pointer-events: none;
+                opacity: 0.6;
+            }
+            .submit-button-wrapper {
+                position: relative;
+                display: inline-block;
+            }
+            .range-slider-container {
+                display: flex;
+                align-items: center;
+                width: 100%;
+            }
+            .range-slider {
+                flex-grow: 1;
+                margin-right: 10px;
+            }
+            .range-value {
+                min-width: 30px;
+                text-align: center;
+                font-weight: bold;
+            }
+        `;
+        document.head.appendChild(styleEl);
+    }
+
+    /**
+     * Add loading overlay to a container element
+     * @param {HTMLElement} container - The container to add loading overlay to
+     * @returns {HTMLElement} - The created loading overlay
+     */
+    function addLoadingOverlay(container) {
+        // Make sure container has position relative
+        if (getComputedStyle(container).position === 'static') {
+            container.style.position = 'relative';
+        }
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        `;
+        
+        container.appendChild(overlay);
+        return overlay;
+    }
+    
+    /**
+     * Remove loading overlay from container
+     * @param {HTMLElement} overlay - The overlay to remove
+     */
+    function removeLoadingOverlay(overlay) {
+        if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+    }
+
+    /**
+     * Process exercise data received from the API
+     * @param {Object} data - Raw exercise data from API
+     */
+    function processExerciseData(data) {
+        console.log('Processing exercise data...');
+        
+        // Check if data exists and has expected structure
+        if (!data) {
+            console.error('Empty data provided to processExerciseData');
+            return;
+        }
+        
+        try {
+            // Process muscle groups
+            if (Array.isArray(data.muscle_groups)) {
+                exerciseData.muscleGroups = data.muscle_groups;
+                console.log(`Processed ${exerciseData.muscleGroups.length} muscle groups`);
+            } else {
+                console.warn('Invalid or missing muscle_groups data');
+                exerciseData.muscleGroups = [];
+            }
+            
+            // Process equipment
+            if (Array.isArray(data.equipment)) {
+                exerciseData.equipment = data.equipment;
+                console.log(`Processed ${exerciseData.equipment.length} equipment items`);
+            } else {
+                console.warn('Invalid or missing equipment data');
+                exerciseData.equipment = [];
+            }
+            
+            // Process exercises
+            if (Array.isArray(data.exercises)) {
+                exerciseData.exercises = data.exercises;
+                console.log(`Processed ${exerciseData.exercises.length} exercises`);
+            } else {
+                console.warn('Invalid or missing exercises data');
+                exerciseData.exercises = [];
+            }
+            
+            // Optional: Build lookup tables for quicker access
+            buildExerciseLookupTables();
+        } catch (error) {
+            console.error('Error processing exercise data:', error);
+            throw new Error('Failed to process exercise data: ' + error.message);
+        }
+    }
+    
+    /**
+     * Build lookup tables for quicker access to exercise data
+     * This improves performance for dropdown population
+     */
+    function buildExerciseLookupTables() {
+        // Equipment by muscle group lookup
+        exerciseData.equipmentByMuscle = {};
+        
+        // Exercises by muscle and equipment lookup
+        exerciseData.exercisesByMuscleAndEquipment = {};
+        
+        // Process each exercise to build the lookup tables
+        exerciseData.exercises.forEach(exercise => {
+            const muscleGroup = exercise.muscle_group;
+            const equipment = exercise.equipment;
+            
+            // Add to equipment by muscle lookup
+            if (!exerciseData.equipmentByMuscle[muscleGroup]) {
+                exerciseData.equipmentByMuscle[muscleGroup] = new Set();
+            }
+            exerciseData.equipmentByMuscle[muscleGroup].add(equipment);
+            
+            // Add to exercises by muscle and equipment lookup
+            const key = `${muscleGroup}|${equipment}`;
+            if (!exerciseData.exercisesByMuscleAndEquipment[key]) {
+                exerciseData.exercisesByMuscleAndEquipment[key] = [];
+            }
+            exerciseData.exercisesByMuscleAndEquipment[key].push(exercise);
+        });
+        
+        // Convert Sets to Arrays
+        Object.keys(exerciseData.equipmentByMuscle).forEach(muscle => {
+            exerciseData.equipmentByMuscle[muscle] = Array.from(exerciseData.equipmentByMuscle[muscle]);
+        });
+        
+        console.log('Built exercise lookup tables for quicker access');
+    }
+
+    /**
+     * Load exercise data with caching and better error handling
      */
     function loadExerciseData() {
         console.log('Loading exercise data...');
+        
+        // Check cache first
+        if (apiCache.has('exercise_library')) {
+            console.log('Using cached exercise data');
+            const cachedData = apiCache.get('exercise_library');
+            exerciseData = { ...cachedData };
+            return Promise.resolve();
+        }
+        
         return fetch('api/exercise_library.php')
             .then(response => {
                 if (!response.ok) {
@@ -78,6 +345,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (result.success) {
                     // Process and store the data
                     processExerciseData(result.data);
+                    
+                    // Store in cache
+                    apiCache.set('exercise_library', { ...exerciseData });
+                    
                     return Promise.resolve();
                 } else {
                     throw new Error(result.message || 'API returned error status');
@@ -91,96 +362,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Process data from the API and normalize it for our application
-     * @param {Object} data The exercise data object to process
-     */
-    function processExerciseData(data) {
-        try {
-            // Store muscle groups
-            if (data.muscle_groups) {
-                exerciseData.muscleGroups = data.muscle_groups;
-            } else if (Array.isArray(data)) {
-                // Handle array format by extracting unique muscle groups
-                const muscleGroups = [...new Set(data
-                    .filter(item => item.muscle_group)
-                    .map(item => typeof item.muscle_group === 'object' ? item.muscle_group.name : item.muscle_group))];
-                exerciseData.muscleGroups = muscleGroups.map(name => ({ id: name, name: name }));
-            }
-            
-            // Store equipment
-            if (data.equipment) {
-                exerciseData.equipment = data.equipment;
-            } else if (Array.isArray(data)) {
-                // Handle array format by extracting unique equipment
-                const equipment = [...new Set(data
-                    .filter(item => item.equipment)
-                    .map(item => typeof item.equipment === 'object' ? item.equipment.name : item.equipment))];
-                exerciseData.equipment = equipment.map(name => ({ id: name, name: name }));
-            }
-            
-            // Store exercises with normalized relationships
-            if (data.exercises) {
-                exerciseData.exercises = data.exercises;
-            } else if (Array.isArray(data)) {
-                exerciseData.exercises = data;
-            } else {
-                exerciseData.exercises = [];
-            }
-            
-            console.log('Processed exercise data:', exerciseData);
-        } catch (error) {
-            console.error('Error processing exercise data:', error);
-            throw new Error('Failed to process exercise data: ' + error.message);
-        }
-    }
-
-    /**
-     * Show a visible error message to the user
-     * @param {string} message - The error message to show
-     */
-    function showErrorMessage(message) {
-        // Try different containers for showing error
-        const containers = [
-            document.querySelector('.alert-container'),
-            document.getElementById('sessionAlertMessage'),
-            document.getElementById('workoutAlertMessage'),
-            document.querySelector('.card-content')
-        ];
-        
-        // Find first available container
-        let container = containers.find(el => el !== null);
-        
-        // If no container is found, create one
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'alert-container mt-3';
-            
-            // Try to insert at beginning of content
-            const content = document.querySelector('.container') || document.body;
-            content.insertBefore(container, content.firstChild);
-        }
-        
-        // Create and show error message
-        const errorAlert = document.createElement('div');
-        errorAlert.className = 'alert alert-danger';
-        errorAlert.innerHTML = `
-            <i class="fas fa-exclamation-circle me-2"></i>
-            ${message}
-        `;
-        
-        // Clear container and add error
-        container.innerHTML = '';
-        container.appendChild(errorAlert);
-        container.style.display = 'block';
-    }
-
-    /**
      * Show session message
      * @param {string} type - Alert type (success, danger, warning, info)
      * @param {string} message - Message to display
      */
     function showSessionMessage(type, message) {
         console.log(`Show session message: ${type} - ${message}`);
+        
+        // Show toast notification
+        showToast(type, message);
         
         // Try to find the session alert message container
         const alertElement = document.getElementById('sessionAlertMessage');
@@ -244,7 +434,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const addExerciseBtn = document.getElementById('addExerciseBtn');
         if (addExerciseBtn) {
             addExerciseBtn.addEventListener('click', function() {
-                document.getElementById('newExerciseForm').style.display = 'block';
+                const newExerciseForm = document.getElementById('newExerciseForm');
+                
+                // Use smooth slide-down animation
+                if (newExerciseForm) {
+                    newExerciseForm.style.display = 'block';
+                    newExerciseForm.style.maxHeight = '0';
+                    newExerciseForm.style.overflow = 'hidden';
+                    newExerciseForm.style.transition = 'max-height 0.5s ease-in-out';
+                    
+                    // Trigger reflow
+                    newExerciseForm.offsetHeight;
+                    
+                    // Expand
+                    newExerciseForm.style.maxHeight = '2000px';
+                    
+                    // Focus on the first input after animation
+                    setTimeout(() => {
+                        const firstInput = newExerciseForm.querySelector('select, input');
+                        if (firstInput) firstInput.focus();
+                    }, 500);
+                }
+                
                 this.style.display = 'none';
             });
         }
@@ -253,8 +464,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const cancelAddExerciseBtn = document.getElementById('cancelAddExercise');
         if (cancelAddExerciseBtn) {
             cancelAddExerciseBtn.addEventListener('click', function() {
-                document.getElementById('newExerciseForm').style.display = 'none';
-                document.getElementById('addExerciseBtn').style.display = 'block';
+                const newExerciseForm = document.getElementById('newExerciseForm');
+                const addExerciseBtn = document.getElementById('addExerciseBtn');
+                
+                // Use smooth slide-up animation
+                if (newExerciseForm) {
+                    newExerciseForm.style.maxHeight = '0';
+                    
+                    // Hide completely after animation
+                    setTimeout(() => {
+                        newExerciseForm.style.display = 'none';
+                        if (addExerciseBtn) addExerciseBtn.style.display = 'block';
+                    }, 500);
+                } else {
+                    // Fallback if animation doesn't work
+                    document.getElementById('newExerciseForm').style.display = 'none';
+                    document.getElementById('addExerciseBtn').style.display = 'block';
+                }
             });
         }
 
@@ -288,176 +514,909 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create the modal if it doesn't exist but should
             createTemplateModal();
         }
+        
+        // Add keyboard shortcuts
+        setupKeyboardShortcuts();
+    }
+    
+    /**
+     * Setup keyboard shortcuts for common actions
+     */
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', function(event) {
+            // Only process if no modal is open and no input is focused
+            const activeElement = document.activeElement;
+            const isInputFocused = activeElement.tagName === 'INPUT' || 
+                                  activeElement.tagName === 'TEXTAREA' || 
+                                  activeElement.tagName === 'SELECT';
+            
+            if (isInputFocused) return;
+            
+            // Check if any modal is open
+            const modalOpen = document.querySelector('.modal.show');
+            if (modalOpen) return;
+            
+            // Alt+N = New Exercise (when on session page)
+            if (event.altKey && event.key === 'n') {
+                const addExerciseBtn = document.getElementById('addExerciseBtn');
+                if (addExerciseBtn && addExerciseBtn.style.display !== 'none') {
+                    event.preventDefault();
+                    addExerciseBtn.click();
+                }
+            }
+            
+            // Alt+T = Load Template (when on session page)
+            if (event.altKey && event.key === 't') {
+                const loadTemplateBtn = document.getElementById('loadTemplateBtn');
+                if (loadTemplateBtn) {
+                    event.preventDefault();
+                    loadTemplateBtn.click();
+                }
+            }
+            
+            // Alt+S = Save/Update Session
+            if (event.altKey && event.key === 's') {
+                const submitBtn = document.querySelector('#sessionForm button[type="submit"]');
+                if (submitBtn) {
+                    event.preventDefault();
+                    submitBtn.click();
+                }
+            }
+        });
     }
 
     /**
-     * Create template modal if it doesn't exist
+     * Handle deletion of a training session
+     * Shows confirmation dialog before deleting
+     */
+    function handleDeleteSession() {
+        console.log('Delete session button clicked');
+        
+        // Get session ID from URL
+        const sessionId = new URLSearchParams(window.location.search).get('id');
+        if (!sessionId) {
+            showToast('danger', 'No session ID found');
+            return;
+        }
+        
+        // Show confirmation dialog with improved UX
+        const confirmDelete = confirm('Are you sure you want to delete this training session? This action cannot be undone.');
+        
+        if (confirmDelete) {
+            console.log(`Deleting session with ID: ${sessionId}`);
+            
+            // Show loading state on button
+            const deleteButton = document.getElementById('deleteSessionBtn');
+            if (deleteButton) {
+                const originalBtnText = deleteButton.innerHTML;
+                deleteButton.disabled = true;
+                deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+            }
+            
+            // Make API call to delete session
+            fetch(`api/training_sessions.php?id=${sessionId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.success) {
+                    showToast('success', 'Training session deleted successfully. Redirecting...');
+                    
+                    // Redirect back to main training page after successful deletion
+                    setTimeout(() => {
+                        window.location.href = 'training.php';
+                    }, 1500);
+                } else {
+                    showToast('danger', result.message || 'Failed to delete training session');
+                    
+                    // Restore button state if we stay on the page
+                    if (deleteButton) {
+                        deleteButton.disabled = false;
+                        deleteButton.innerHTML = originalBtnText;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting session:', error);
+                showToast('danger', 'An error occurred while deleting the session');
+                
+                // Restore button state
+                if (deleteButton) {
+                    deleteButton.disabled = false;
+                    deleteButton.innerHTML = originalBtnText;
+                }
+            });
+        }
+    }
+    
+    /**
+     * Fetch and render a newly added exercise without page refresh
+     * @param {number|string} sessionId - ID of the current training session
+     */
+    function fetchAndRenderNewExercise(sessionId) {
+        if (!sessionId) {
+            console.error('No session ID provided for fetching new exercise');
+            return;
+        }
+        
+        console.log(`Fetching latest exercise for session ${sessionId}`);
+        
+        // Get exercise list container
+        const exerciseList = document.getElementById('exercisesList');
+        if (!exerciseList) {
+            console.error('Exercise list container not found');
+            return;
+        }
+        
+        // Add loading indicator
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'text-center my-3';
+        loadingIndicator.innerHTML = `
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        `;
+        exerciseList.appendChild(loadingIndicator);
+        
+        // Fetch latest exercise data
+        fetch(`api/workout_details.php?session_id=${sessionId}&latest=true`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                // Remove loading indicator
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    // Get the latest exercise
+                    const newExercise = result.data[0];
+                    
+                    // Add the new exercise to the list
+                    const exerciseItem = createExerciseListItem(newExercise);
+                    
+                    // Check if the "No exercises yet" message exists and remove it
+                    const noExercisesMsg = exerciseList.querySelector('.no-exercises-message');
+                    if (noExercisesMsg) {
+                        noExercisesMsg.remove();
+                    }
+                    
+                    // Add the new exercise item to the list with a highlighting effect
+                    exerciseList.appendChild(exerciseItem);
+                    
+                    // Add highlight animation
+                    setTimeout(() => {
+                        exerciseItem.classList.add('bg-light-success');
+                        setTimeout(() => {
+                            exerciseItem.classList.remove('bg-light-success');
+                        }, 2000);
+                    }, 100);
+                    
+                    // Add event listeners to the new exercise item
+                    setupExerciseItemEventListeners(exerciseItem);
+                } else {
+                    console.warn('No new exercise data returned from API');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching new exercise:', error);
+                
+                // Remove loading indicator
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
+                
+                // Show error message
+                showToast('danger', 'Failed to load new exercise. Please refresh the page.');
+            });
+    }
+    
+    /**
+     * Create an exercise list item element
+     * @param {Object} exercise - Exercise data
+     * @returns {HTMLElement} - Exercise list item element
+     */
+    function createExerciseListItem(exercise) {
+        const listItem = document.createElement('div');
+        listItem.className = 'card mb-3 exercise-item';
+        listItem.dataset.exerciseId = exercise.id;
+        listItem.style.transition = 'background-color 0.5s ease';
+        
+        // Format exercise card with better UI
+        listItem.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <span class="text-primary">${exercise.muscle_group}</span> - 
+                    ${exercise.exercise_name}
+                </h5>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-primary edit-exercise" title="Edit Exercise">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-exercise" title="Delete Exercise">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="card-text"><strong>Equipment:</strong> ${exercise.equipment}</p>
+                        <p class="card-text"><strong>Sets:</strong> ${exercise.sets || 'N/A'}</p>
+                        <p class="card-text"><strong>Reps:</strong> ${exercise.reps || 'N/A'}</p>
+                        <p class="card-text"><strong>Weight:</strong> ${exercise.weight ? exercise.weight + ' kg' : 'N/A'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="card-text"><strong>Pre Energy Level:</strong> ${exercise.pre_energy_level || 'N/A'}/10</p>
+                        <p class="card-text"><strong>Pre Soreness Level:</strong> ${exercise.pre_soreness_level || 'N/A'}/10</p>
+                        <p class="card-text"><strong>Stimulus Rating:</strong> ${exercise.stimulus_rating || 'N/A'}/10</p>
+                        <p class="card-text"><strong>Fatigue Rating:</strong> ${exercise.fatigue_level || 'N/A'}/10</p>
+                    </div>
+                </div>
+                ${exercise.notes ? 
+                    `<div class="mt-3">
+                        <strong>Notes:</strong>
+                        <p class="card-text">${exercise.notes}</p>
+                    </div>` : ''}
+            </div>
+        `;
+        
+        return listItem;
+    }
+    
+    /**
+     * Setup event listeners for an exercise list item
+     * @param {HTMLElement} exerciseItem - Exercise list item element
+     */
+    function setupExerciseItemEventListeners(exerciseItem) {
+        // Edit button handler
+        const editBtn = exerciseItem.querySelector('.edit-exercise');
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                const exerciseId = exerciseItem.dataset.exerciseId;
+                editExercise(exerciseId);
+            });
+        }
+        
+        // Delete button handler
+        const deleteBtn = exerciseItem.querySelector('.delete-exercise');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                const exerciseId = exerciseItem.dataset.exerciseId;
+                deleteExercise(exerciseId, exerciseItem);
+            });
+        }
+    }
+    
+    /**
+     * Handle editing an exercise
+     * @param {string|number} exerciseId - ID of the exercise to edit
+     */
+    function editExercise(exerciseId) {
+        console.log(`Editing exercise with ID: ${exerciseId}`);
+        
+        // Open exercise edit modal or form
+        // This can be implemented based on your UI design
+        showToast('info', 'Exercise edit functionality is being implemented');
+        
+        // For now, refresh the page to the exercise details
+        // This should be replaced with a modal or inline editing
+        /*
+        const sessionId = new URLSearchParams(window.location.search).get('id');
+        if (sessionId) {
+            window.location.href = `training.php?id=${sessionId}&exercise=${exerciseId}`;
+        }
+        */
+    }
+    
+    /**
+     * Handle deleting an exercise
+     * @param {string|number} exerciseId - ID of the exercise to delete
+     * @param {HTMLElement} exerciseItem - Exercise list item element to remove
+     */
+    function deleteExercise(exerciseId, exerciseItem) {
+        console.log(`Deleting exercise with ID: ${exerciseId}`);
+        
+        // Show confirmation dialog
+        const confirmDelete = confirm('Are you sure you want to delete this exercise? This action cannot be undone.');
+        
+        if (confirmDelete) {
+            // Show loading state
+            exerciseItem.style.opacity = '0.5';
+            
+            // Make API call to delete exercise
+            fetch(`api/workout_details.php?id=${exerciseId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.success) {
+                    // Remove exercise item with animation
+                    exerciseItem.style.maxHeight = exerciseItem.scrollHeight + 'px';
+                    exerciseItem.style.overflow = 'hidden';
+                    exerciseItem.style.transition = 'max-height 0.5s ease-out, opacity 0.5s ease-out, margin-bottom 0.5s ease-out';
+                    
+                    setTimeout(() => {
+                        exerciseItem.style.maxHeight = '0';
+                        exerciseItem.style.marginBottom = '0';
+                        exerciseItem.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            exerciseItem.remove();
+                            
+                            // Check if there are no more exercises
+                            const exercisesList = document.getElementById('exercisesList');
+                            if (exercisesList && exercisesList.children.length === 0) {
+                                // Add "no exercises" message
+                                const noExercisesMsg = document.createElement('div');
+                                noExercisesMsg.className = 'alert alert-info no-exercises-message';
+                                noExercisesMsg.textContent = 'No exercises added to this session yet.';
+                                exercisesList.appendChild(noExercisesMsg);
+                            }
+                        }, 500);
+                    }, 10);
+                    
+                    showToast('success', 'Exercise deleted successfully');
+                } else {
+                    // Restore exercise item appearance
+                    exerciseItem.style.opacity = '1';
+                    showToast('danger', result.message || 'Failed to delete exercise');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting exercise:', error);
+                
+                // Restore exercise item appearance
+                exerciseItem.style.opacity = '1';
+                showToast('danger', 'An error occurred while deleting the exercise');
+            });
+        }
+    }
+    
+    /**
+     * Load workout details for a specific session
+     * @param {string|number} sessionId - ID of the session to load
+     */
+    function loadWorkoutDetails(sessionId) {
+        if (!sessionId) {
+            console.error('No session ID provided for loading workout details');
+            return;
+        }
+        
+        console.log(`Loading workout details for session ${sessionId}`);
+        
+        // Get the container for exercises
+        const exercisesList = document.getElementById('exercisesList');
+        if (!exercisesList) {
+            console.error('Exercises list container not found');
+            return;
+        }
+        
+        // Show loading state
+        exercisesList.innerHTML = `
+            <div class="text-center my-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading exercises...</span>
+                </div>
+                <p class="mt-2">Loading exercises...</p>
+            </div>
+        `;
+        
+        // Fetch workout details
+        fetch(`api/workout_details.php?session_id=${sessionId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                // Clear loading indicator
+                exercisesList.innerHTML = '';
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    // Render each exercise
+                    result.data.forEach(exercise => {
+                        const exerciseItem = createExerciseListItem(exercise);
+                        exercisesList.appendChild(exerciseItem);
+                        setupExerciseItemEventListeners(exerciseItem);
+                    });
+                    
+                    // Also update any session details if needed
+                    updateSessionDetails(result.session || {});
+                } else {
+                    // No exercises found
+                    exercisesList.innerHTML = `
+                        <div class="alert alert-info no-exercises-message">
+                            No exercises added to this session yet.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading workout details:', error);
+                
+                // Show error message
+                exercisesList.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load exercises. Please try refreshing the page.
+                        <p class="small mt-2">Error: ${error.message}</p>
+                    </div>
+                `;
+            });
+    }
+    
+    /**
+     * Update session details with data from API
+     * @param {Object} sessionData - Session data from API
+     */
+    function updateSessionDetails(sessionData) {
+        if (!sessionData) return;
+        
+        console.log('Updating session details with:', sessionData);
+        
+        // Update session title if it exists
+        const sessionTitle = document.getElementById('sessionTitle');
+        if (sessionTitle && sessionData.name) {
+            sessionTitle.textContent = sessionData.name;
+        }
+        
+        // Update date field if it exists
+        const dateField = document.getElementById('date');
+        if (dateField && sessionData.date) {
+            dateField.value = sessionData.date;
+        }
+        
+        // Update time fields if they exist
+        if (sessionData.training_start) {
+            const startTime = sessionData.training_start.split(' ')[1].substring(0, 5);
+            const startTimeField = document.getElementById('training_start_time');
+            if (startTimeField) {
+                startTimeField.value = startTime;
+            }
+        }
+        
+        if (sessionData.training_end) {
+            const endTime = sessionData.training_end.split(' ')[1].substring(0, 5);
+            const endTimeField = document.getElementById('training_end_time');
+            if (endTimeField) {
+                endTimeField.value = endTime;
+            }
+        }
+        
+        // Update session notes
+        const notesField = document.getElementById('notes');
+        if (notesField && sessionData.notes) {
+            notesField.value = sessionData.notes;
+        }
+    }
+    
+    /**
+     * Load recent training sessions
+     */
+    function loadRecentSessions() {
+        console.log('Loading recent training sessions');
+        
+        const recentSessionsContainer = document.getElementById('recentSessions');
+        if (!recentSessionsContainer) {
+            console.error('Recent sessions container not found');
+            return;
+        }
+        
+        // Show loading state
+        recentSessionsContainer.innerHTML = `
+            <div class="text-center my-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading recent sessions...</span>
+                </div>
+                <p class="mt-2">Loading recent sessions...</p>
+            </div>
+        `;
+        
+        // Fetch recent sessions
+        fetch('api/training_sessions.php?limit=5')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                // Clear loading indicator
+                recentSessionsContainer.innerHTML = '';
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    // Create table with recent sessions
+                    const table = document.createElement('table');
+                    table.className = 'table table-hover';
+                    
+                    // Table header
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Session Name</th>
+                                <th>Duration</th>
+                                <th>Exercises</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    `;
+                    
+                    const tbody = table.querySelector('tbody');
+                    
+                    // Add each session to the table
+                    result.data.forEach(session => {
+                        const row = document.createElement('tr');
+                        row.className = 'session-row';
+                        row.dataset.sessionId = session.id;
+                        
+                        // Format duration if available
+                        let duration = 'N/A';
+                        if (session.training_start && session.training_end) {
+                            const start = new Date(session.training_start);
+                            const end = new Date(session.training_end);
+                            const diffMs = end - start;
+                            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                            const diffMins = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            
+                            duration = `${diffHrs}h ${diffMins}m`;
+                        }
+                        
+                        // Format date
+                        const date = new Date(session.date);
+                        const formattedDate = date.toLocaleDateString();
+                        
+                        row.innerHTML = `
+                            <td>${formattedDate}</td>
+                            <td>${session.name || 'Unnamed Session'}</td>
+                            <td>${duration}</td>
+                            <td>${session.exercise_count || 0}</td>
+                            <td>
+                                <a href="training.php?id=${session.id}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit me-1"></i> View/Edit
+                                </a>
+                            </td>
+                        `;
+                        
+                        tbody.appendChild(row);
+                    });
+                    
+                    recentSessionsContainer.appendChild(table);
+                    
+                    // Add click event for rows
+                    const rows = tbody.querySelectorAll('.session-row');
+                    rows.forEach(row => {
+                        row.addEventListener('click', function(e) {
+                            // Don't trigger if they clicked on the button itself
+                            if (e.target.tagName !== 'A' && !e.target.closest('a')) {
+                                const sessionId = this.dataset.sessionId;
+                                window.location.href = `training.php?id=${sessionId}`;
+                            }
+                        });
+                    });
+                } else {
+                    // No sessions found
+                    recentSessionsContainer.innerHTML = `
+                        <div class="alert alert-info">
+                            No recent training sessions found. 
+                            <a href="training.php" class="alert-link">Create your first session</a>.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading recent sessions:', error);
+                
+                // Show error message
+                recentSessionsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load recent sessions. Please try refreshing the page.
+                    </div>
+                `;
+            });
+    }
+    
+    /**
+     * Create template modal for loading workout templates
      */
     function createTemplateModal() {
-        console.log('Creating template modal dynamically');
+        console.log('Creating template modal');
         
-        // Create modal container
+        // Create modal elements
         const modal = document.createElement('div');
-        modal.id = 'templateModal';
         modal.className = 'modal fade';
+        modal.id = 'templateModal';
         modal.tabIndex = '-1';
         modal.setAttribute('aria-labelledby', 'templateModalLabel');
         modal.setAttribute('aria-hidden', 'true');
         
-        // Set modal content
+        // Modal content
         modal.innerHTML = `
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="templateModalLabel">Select Workout Template</h5>
+                        <h5 class="modal-title" id="templateModalLabel">Load Workout Template</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div id="templatesList">
-                            <!-- Templates will be loaded here -->
+                        <div id="templateList" class="mb-3">
+                            <div class="text-center my-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading templates...</span>
+                                </div>
+                                <p class="mt-2">Loading templates...</p>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     </div>
                 </div>
             </div>
         `;
         
-        // Add modal to document body
+        // Add modal to body
         document.body.appendChild(modal);
         
-        console.log('Template modal created dynamically');
+        // Initialize modal (requires Bootstrap JS)
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const templateModal = new bootstrap.Modal(modal);
+            templateModal._element = modal;
+            return templateModal;
+        } else {
+            console.warn('Bootstrap JS not available, modal may not function properly');
+            return { show: () => modal.style.display = 'block' };
+        }
     }
-
+    
     /**
-     * Open the template modal
+     * Open template modal and load templates
      */
     function openTemplateModal() {
         console.log('Opening template modal');
         
         // Get or create the modal
         let templateModal = document.getElementById('templateModal');
+        let bootstrapModal;
+        
         if (!templateModal) {
-            console.log('Template modal not found, creating it');
-            createTemplateModal();
+            bootstrapModal = createTemplateModal();
             templateModal = document.getElementById('templateModal');
-        }
-        
-        if (templateModal) {
-            // Make sure the modal body exists
-            let modalBody = templateModal.querySelector('.modal-body');
-            if (!modalBody) {
-                console.log('Modal body not found, creating it');
-                const modalContent = templateModal.querySelector('.modal-content');
-                modalBody = document.createElement('div');
-                modalBody.className = 'modal-body';
-                
-                // Insert before the footer or add to the end
-                const modalFooter = templateModal.querySelector('.modal-footer');
-                if (modalFooter) {
-                    modalContent.insertBefore(modalBody, modalFooter);
-                } else {
-                    modalContent.appendChild(modalBody);
-                }
-            }
-            
-            // Make sure the templates list container exists
-            let templatesList = modalBody.querySelector('#templatesList');
-            if (!templatesList) {
-                console.log('Templates list container not found, creating it');
-                templatesList = document.createElement('div');
-                templatesList.id = 'templatesList';
-                modalBody.appendChild(templatesList);
-            }
-            
-            // Load templates
-            loadTemplates();
-            
-            // Initialize and show the modal with Bootstrap
-            try {
-                const bsModal = new bootstrap.Modal(templateModal);
-                bsModal.show();
-            } catch (error) {
-                console.error('Error showing modal:', error);
-                alert('Error showing template modal. Please try again.');
-            }
+        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrapModal = new bootstrap.Modal(templateModal);
         } else {
-            console.error('Could not find or create template modal');
-            showSessionMessage('danger', 'Could not open template selection. Please try again.');
+            bootstrapModal = { show: () => templateModal.style.display = 'block' };
         }
-    }
-
-    /**
-     * Handle deleting a training session
-     */
-    function handleDeleteSession() {
-        console.log('Deleting training session');
         
+        // Show the modal
+        bootstrapModal.show();
+        
+        // Load templates into the modal
+        loadTemplates();
+    }
+    
+    /**
+     * Load workout templates into template modal
+     */
+    function loadTemplates() {
+        console.log('Loading workout templates');
+        
+        const templateList = document.getElementById('templateList');
+        if (!templateList) {
+            console.error('Template list container not found');
+            return;
+        }
+        
+        // Fetch templates
+        fetch('api/workout_templates.php')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                // Clear loading indicator
+                templateList.innerHTML = '';
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    // Create template cards
+                    const templatesContainer = document.createElement('div');
+                    templatesContainer.className = 'row row-cols-1 row-cols-md-2 g-4';
+                    
+                    result.data.forEach(template => {
+                        const card = document.createElement('div');
+                        card.className = 'col';
+                        
+                        card.innerHTML = `
+                            <div class="card h-100 template-card" data-template-id="${template.id}">
+                                <div class="card-body">
+                                    <h5 class="card-title">${template.name}</h5>
+                                    <p class="card-text">
+                                        <strong>Exercises:</strong> ${template.exercise_count || 'Unknown'}
+                                    </p>
+                                    <p class="card-text small text-muted">
+                                        Created: ${new Date(template.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-primary btn-sm load-template" data-template-id="${template.id}">
+                                        <i class="fas fa-plus-circle me-1"></i> Load Template
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        templatesContainer.appendChild(card);
+                    });
+                    
+                    templateList.appendChild(templatesContainer);
+                    
+                    // Add event listeners to template cards
+                    const loadButtons = templateList.querySelectorAll('.load-template');
+                    loadButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            const templateId = this.dataset.templateId;
+                            loadWorkoutTemplate(templateId);
+                        });
+                    });
+                } else {
+                    // No templates found
+                    templateList.innerHTML = `
+                        <div class="alert alert-info">
+                            No workout templates found. 
+                            <a href="workout_templates.php" class="alert-link">Create your first template</a>.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading templates:', error);
+                
+                // Show error message
+                templateList.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load workout templates. Please try refreshing the page.
+                    </div>
+                `;
+            });
+    }
+    
+    /**
+     * Load a workout template into the current session
+     * @param {string|number} templateId - ID of the template to load
+     */
+    function loadWorkoutTemplate(templateId) {
+        console.log(`Loading workout template: ${templateId}`);
+        
+        // Get current session ID
         const sessionId = new URLSearchParams(window.location.search).get('id');
         if (!sessionId) {
-            showSessionMessage('danger', 'Session ID not found');
+            showToast('danger', 'No session ID found. Please save the session first.');
             return;
         }
         
-        if (!confirm('Are you sure you want to delete this training session? This will also delete all exercises in this session. This action cannot be undone.')) {
-            return;
-        }
-        
-        fetch('api/training_sessions.php', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id: sessionId })
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showSessionMessage('success', 'Training session deleted successfully');
-                
-                // Redirect to training page
-                setTimeout(() => {
-                    window.location.href = 'training.php';
-                }, 1000);
-            } else {
-                showSessionMessage('danger', result.message || 'Failed to delete training session');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting training session:', error);
-            showSessionMessage('danger', 'An error occurred. Please try again.');
-        });
-    }
-
-    function setupForms() {
-        console.log('Setting up forms...');
-        
-        // Setup session form
-        const sessionForm = document.getElementById('sessionForm');
-        if (sessionForm) {
-            // Use an anonymous function instead of directly referencing handleSessionFormSubmit
-            sessionForm.addEventListener('submit', function(event) {
-                event.preventDefault();
-                console.log('Session form submitted');
-                
-                try {
-                    handleSessionFormSubmit(event);
-                } catch (error) {
-                    console.error('Error in form submission handler:', error);
-                    showErrorMessage('Error saving session. Please try again.');
+        // Get the template load button and show loading state
+        const loadButton = document.querySelector(`.load-template[data-template-id="${templateId}"]`);
+        if (loadButton) {
+            const originalBtnText = loadButton.innerHTML;
+            loadButton.disabled = true;
+            loadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+            
+            // Make all other template buttons disabled
+            const allButtons = document.querySelectorAll('.load-template');
+            allButtons.forEach(btn => {
+                if (btn !== loadButton) btn.disabled = true;
+            });
+            
+            // Make API call to load template
+            fetch(`api/workout_templates.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'apply_to_session',
+                    template_id: templateId,
+                    session_id: sessionId
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
+                return response.json();
+            })
+            .then(result => {
+                if (result.success) {
+                    // Close the modal
+                    const modal = document.getElementById('templateModal');
+                    if (modal && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                        if (bootstrapModal) bootstrapModal.hide();
+                    }
+                    
+                    showToast('success', 'Template loaded successfully! Refreshing...');
+                    
+                    // Refresh the page to show new exercises
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Restore button state
+                    loadButton.disabled = false;
+                    loadButton.innerHTML = originalBtnText;
+                    
+                    // Re-enable other buttons
+                    allButtons.forEach(btn => btn.disabled = false);
+                    
+                    showToast('danger', result.message || 'Failed to load template');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading template:', error);
+                
+                // Restore button state
+                loadButton.disabled = false;
+                loadButton.innerHTML = originalBtnText;
+                
+                // Re-enable other buttons
+                allButtons.forEach(btn => btn.disabled = false);
+                
+                showToast('danger', 'An error occurred while loading the template');
+            });
+        } else {
+            // Make API call without updating UI
+            showToast('info', 'Loading template...');
+            
+            fetch(`api/workout_templates.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'apply_to_session',
+                    template_id: templateId,
+                    session_id: sessionId
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showToast('success', 'Template loaded successfully! Refreshing...');
+                    
+                    // Refresh the page to show new exercises
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('danger', result.message || 'Failed to load template');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading template without UI updates:', error);
+                showToast('danger', 'An error occurred while loading the template');
             });
         }
-
-        // Setup new exercise form
-        setupNewExerciseForm();
-        
-        // Setup existing exercise forms
-        setupExistingExerciseForms();
-        
-        // Setup range sliders
-        setupRangeSliders();
     }
 
     /**
@@ -471,6 +1430,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        
+        // Validate form before submission
+        if (!data.date) {
+            showToast('danger', 'Please select a date for the training session');
+            return;
+        }
         
         // Format time fields
         if (data.date && data.training_start_time) {
@@ -491,13 +1456,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const submitBtn = form.querySelector('button[type="submit"]');
         if (!submitBtn) {
             console.error('Submit button not found in form');
-            showSessionMessage('danger', 'Form error: Submit button not found');
+            showToast('danger', 'Form error: Submit button not found');
             return;
+        }
+        
+        // Create a wrapper for the button if it doesn't have one already
+        let buttonWrapper = submitBtn.closest('.submit-button-wrapper');
+        if (!buttonWrapper) {
+            buttonWrapper = document.createElement('div');
+            buttonWrapper.className = 'submit-button-wrapper';
+            submitBtn.parentNode.insertBefore(buttonWrapper, submitBtn);
+            buttonWrapper.appendChild(submitBtn);
         }
         
         const originalBtnText = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        const loadingOverlay = addLoadingOverlay(form);
         
         fetch(url, {
             method: method,
@@ -516,26 +1491,27 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success) {
                 if (isEdit) {
                     // Just show success message for edits
-                    showSessionMessage('success', 'Training session updated successfully');
+                    showToast('success', 'Training session updated successfully');
                 } else {
                     // Redirect to the new session page for new sessions
-                    showSessionMessage('success', 'Training session created! Redirecting...');
+                    showToast('success', 'Training session created! Redirecting...');
                     setTimeout(() => {
                         window.location.href = `training.php?id=${result.session_id}`;
                     }, 1000);
                 }
             } else {
-                showSessionMessage('danger', result.message || 'Failed to save training session');
+                showToast('danger', result.message || 'Failed to save training session');
             }
         })
         .catch(error => {
             console.error('Error saving training session:', error);
-            showSessionMessage('danger', 'An error occurred. Please try again.');
+            showToast('danger', 'An error occurred. Please try again.');
         })
         .finally(() => {
             // Restore button state
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnText;
+            removeLoadingOverlay(loadingOverlay);
         });
     }
 
@@ -551,16 +1527,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
         
+        // Validate form
+        if (!data.muscle_group || !data.equipment || !data.exercise_name) {
+            showToast('danger', 'Please complete all required fields');
+            return;
+        }
+        
         // Show loading state
         const submitBtn = form.querySelector('button[type="submit"]');
         if (!submitBtn) {
-            showWorkoutMessage('danger', 'Submit button not found', document.getElementById('workoutAlertMessage'));
+            showToast('danger', 'Submit button not found');
             return;
         }
         
         const originalBtnText = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        const loadingOverlay = addLoadingOverlay(form);
         
         fetch('api/workout_details.php', {
             method: 'POST',
@@ -572,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                showWorkoutMessage('success', 'Exercise added successfully', document.getElementById('workoutAlertMessage'));
+                showToast('success', 'Exercise added successfully');
                 
                 // Reset form
                 form.reset();
@@ -588,336 +1571,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (document.getElementById('newStimulusDisplay')) document.getElementById('newStimulusDisplay').textContent = '5';
                 if (document.getElementById('newFatigueLevelDisplay')) document.getElementById('newFatigueLevelDisplay').textContent = '5';
                 
-                // Hide new exercise form
-                document.getElementById('newExerciseForm').style.display = 'none';
-                // Show the add exercise button
-                document.getElementById('addExerciseBtn').style.display = 'block';
+                // Hide new exercise form with animation
+                const newExerciseForm = document.getElementById('newExerciseForm');
+                if (newExerciseForm) {
+                    newExerciseForm.style.maxHeight = '0';
+                    
+                    // Hide completely after animation
+                    setTimeout(() => {
+                        newExerciseForm.style.display = 'none';
+                        const addExerciseBtn = document.getElementById('addExerciseBtn');
+                        if (addExerciseBtn) addExerciseBtn.style.display = 'block';
+                    }, 500);
+                } else {
+                    document.getElementById('newExerciseForm').style.display = 'none';
+                    document.getElementById('addExerciseBtn').style.display = 'block';
+                }
                 
                 // Fetch and add the new exercise to the page without full refresh
                 fetchAndRenderNewExercise(data.session_id);
             } else {
-                showWorkoutMessage('danger', result.message || 'Failed to add exercise', document.getElementById('workoutAlertMessage'));
+                showToast('danger', result.message || 'Failed to add exercise');
             }
         })
         .catch(error => {
             console.error('Error adding exercise:', error);
-            showWorkoutMessage('danger', 'An error occurred. Please try again.', document.getElementById('workoutAlertMessage'));
+            showToast('danger', 'An error occurred. Please try again.');
         })
         .finally(() => {
             // Restore button state
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnText;
-        });
-    }
-
-    /**
-     * Show workout message
-     * @param {string} type - Alert type (success, danger, warning, info)
-     * @param {string} message - Message to display
-     * @param {Element} container - Element to show message in
-     */
-    function showWorkoutMessage(type, message, container) {
-        if (!container) {
-            console.error('No container provided for workout message');
-            return;
-        }
-        
-        container.className = `alert alert-${type} mt-3`;
-        container.innerHTML = message;
-        container.style.display = 'block';
-        
-        // Auto-hide success messages after 3 seconds
-        if (type === 'success') {
-            setTimeout(() => {
-                container.style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    /**
-     * Fetch and render the newly added exercise
-     * @param {number} sessionId - The session ID
-     */
-    function fetchAndRenderNewExercise(sessionId) {
-        if (!sessionId) {
-            console.error('No session ID provided for fetching new exercise');
-            return;
-        }
-        
-        fetch(`api/workout_details.php?session_id=${sessionId}`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success && result.data && result.data.length > 0) {
-                    // Reload the exercises list
-                    loadWorkoutDetails(sessionId);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching new exercise:', error);
-            });
-    }
-
-    /**
-     * Load templates
-     */
-    function loadTemplates() {
-        console.log('Loading templates');
-        
-        // Find templates container
-        const templatesList = document.getElementById('templatesList');
-        if (!templatesList) {
-            console.error('Templates list container not found');
-            return;
-        }
-        
-        // Show loading indicator
-        templatesList.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p>Loading templates...</p>
-            </div>
-        `;
-        
-        // Load templates from API
-        fetch('api/workout_templates.php')
-            .then(response => response.json())
-            .then(result => {
-                if (result.success && result.data && result.data.length > 0) {
-                    renderTemplatesList(result.data, templatesList);
-                } else {
-                    templatesList.innerHTML = `
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            No workout templates found. <a href="workout_templates.php">Create a template</a> to get started.
-                        </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading templates:', error);
-                templatesList.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Error loading templates. Please try again.
-                    </div>
-                `;
-            });
-    }
-
-    /**
-     * Render templates list
-     * @param {Array} templates - Array of template objects
-     * @param {HTMLElement} container - Container element for the templates
-     */
-    function renderTemplatesList(templates, container) {
-        console.log('Rendering templates:', templates.length);
-        
-        let html = '';
-        
-        templates.forEach(template => {
-            const isFavorite = template.is_favorite === '1' || template.is_favorite === 1 || template.is_favorite === true;
-            
-            html += `
-                <div class="card mb-3 template-card" data-id="${template.id}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="card-title">
-                                ${isFavorite ? '<i class="fas fa-star text-warning me-1"></i>' : ''}
-                                ${template.name}
-                            </h5>
-                            <span class="badge bg-info">${template.exercise_count} exercises</span>
-                        </div>
-                        
-                        ${template.description ? `<p class="card-text text-muted">${template.description}</p>` : ''}
-                        
-                        <div class="d-flex justify-content-end mt-3">
-                            <button class="btn btn-primary use-template-btn" data-id="${template.id}">
-                                <i class="fas fa-plus me-1"></i> Use Template
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
-        
-        // Add event listeners to use template buttons
-        const buttons = container.querySelectorAll('.use-template-btn');
-        console.log(`Found ${buttons.length} template buttons`);
-        
-        buttons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const templateId = this.dataset.id;
-                console.log('Use template button clicked for template ID:', templateId);
-                useTemplate(templateId);
-            });
-        });
-    }
-
-    /**
-     * Use a template to add exercises to the current session
-     * @param {string} templateId - ID of the template to use
-     */
-    function useTemplate(templateId) {
-        if (!templateId) {
-            console.error('No template ID provided');
-            return;
-        }
-        
-        // Get session ID from URL
-        const sessionId = new URLSearchParams(window.location.search).get('id');
-        if (!sessionId) {
-            console.error('No session ID found in URL');
-            showSessionMessage('danger', 'Session ID not found. Please save the session first.');
-            return;
-        }
-        
-        console.log(`Applying template ID ${templateId} to session ID ${sessionId}`);
-        
-        // Show loading state
-        const btn = document.querySelector(`.use-template-btn[data-id="${templateId}"]`);
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
-        }
-        
-        // Get the session date from the form
-        let sessionDate = document.querySelector('input[name="date"]')?.value;
-        
-        // If we couldn't find the date in the form, try to get it from the existing exercise data
-        if (!sessionDate) {
-            // Try to get today's date as fallback in YYYY-MM-DD format
-            const today = new Date();
-            sessionDate = today.toISOString().split('T')[0];
-            console.log('Using today as fallback date:', sessionDate);
-        }
-        
-        // Prepare data with date included
-        const data = {
-            template_id: templateId,
-            session_id: sessionId,
-            date: sessionDate
-        };
-        
-        console.log('Sending template data:', data);
-        
-        // Send request to add template exercises to session
-        fetch(`api/training_sessions.php?action=apply_template&session_id=${sessionId}&template_id=${templateId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(result => {
-            console.log('Apply template result:', result);
-            if (result.success) {
-                // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('templateModal'));
-                if (modal) modal.hide();
-                
-                // Show success message (on current page, will be lost on redirect)
-                showSessionMessage('success', result.message || 'Template applied successfully. Redirecting...');
-                
-                // If a new session was created, redirect to it
-                if (result.session_id && result.session_id !== sessionId) {
-                    console.log(`New session created with ID ${result.session_id}. Redirecting...`);
-                    setTimeout(() => {
-                        window.location.href = `training.php?id=${result.session_id}`;
-                    }, 1000);
-                } else {
-                    // No new session, just reload exercises for current session
-                    loadWorkoutDetails(sessionId);
-                }
-            } else {
-                showSessionMessage('danger', result.message || 'Failed to add template exercises');
-            }
-        })
-        .catch(error => {
-            console.error('Error using template:', error);
-            showSessionMessage('danger', 'Error adding template exercises. Please try again.');
-        })
-        .finally(() => {
-            // Reset button
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-plus me-1"></i> Use Template';
-            }
-        });
-    }
-
-    /**
-     * Set up the new exercise form with cascading dropdowns
-     */
-    function setupNewExerciseForm() {
-        console.log('Setting up new exercise form...');
-        
-        // Get the workout details form
-        const workoutDetailsForm = document.getElementById('workoutDetailsForm');
-        if (!workoutDetailsForm) {
-            console.log('Workout details form not found - may not be on session edit page');
-            return;
-        }
-
-        // Get the form elements
-        const muscleGroupSelect = document.getElementById('newMuscleGroup');
-        const equipmentSelect = document.getElementById('newEquipment');
-        const exerciseSelect = document.getElementById('newExerciseName');
-        
-        if (!muscleGroupSelect || !equipmentSelect || !exerciseSelect) {
-            console.error('One or more form elements not found', {
-                muscleGroup: !!muscleGroupSelect,
-                equipment: !!equipmentSelect,
-                exercise: !!exerciseSelect
-            });
-            return;
-        }
-
-        // Populate muscle group dropdown
-        populateMuscleGroupDropdown(muscleGroupSelect);
-
-        // Clear equipment and exercise dropdowns initially
-        clearDropdown(equipmentSelect, 'Select Equipment');
-        clearDropdown(exerciseSelect, 'Select Exercise');
-
-        // Add custom option functionality
-        addCustomOptionSupport(muscleGroupSelect, equipmentSelect, exerciseSelect);
-        
-        // Set up form submission
-        workoutDetailsForm.addEventListener('submit', handleNewExercise);
-    }
-
-    /**
-     * Setup the existing exercise forms
-     */
-    function setupExistingExerciseForms() {
-        const exerciseForms = document.querySelectorAll('.workout-detail-form');
-        if (exerciseForms.length === 0) {
-            console.log('No existing exercise forms found - may not be on session edit page');
-            return;
-        }
-
-        console.log('Setting up existing exercise forms...');
-        
-        // Setup each form
-        exerciseForms.forEach(form => {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                handleUpdateExistingExercise(this);
-            });
-            
-            // Setup delete buttons
-            const deleteBtn = form.closest('.exercise-container')?.querySelector('.delete-exercise-btn');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', function() {
-                    const exerciseId = form.querySelector('input[name="id"]').value;
-                    handleDeleteExistingExercise(exerciseId);
-                });
-            }
+            removeLoadingOverlay(loadingOverlay);
         });
     }
 
@@ -935,19 +1619,37 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Setting up range sliders...');
         
         rangeInputs.forEach(input => {
-            // Initial value update
+            // Wrap range slider and value display in a container for better styling
+            const parent = input.parentElement;
             const valueDisplay = input.nextElementSibling;
-            if (valueDisplay && valueDisplay.classList.contains('range-value')) {
+            
+            if (valueDisplay && valueDisplay.classList.contains('range-value') && !parent.classList.contains('range-slider-container')) {
+                // Create container
+                const container = document.createElement('div');
+                container.className = 'range-slider-container';
+                
+                // Move elements into container
+                parent.insertBefore(container, input);
+                container.appendChild(input);
+                container.appendChild(valueDisplay);
+                
+                // Initial value update
+                valueDisplay.textContent = input.value;
+            } else if (valueDisplay && valueDisplay.classList.contains('range-value')) {
+                // Just update the initial value
                 valueDisplay.textContent = input.value;
             }
             
-            // Input event listener
-            input.addEventListener('input', function() {
+            // Use debounce for smoother interaction
+            const debouncedUpdate = debounce(function(e) {
                 const valueDisplay = this.nextElementSibling;
                 if (valueDisplay && valueDisplay.classList.contains('range-value')) {
                     valueDisplay.textContent = this.value;
                 }
-            });
+            }, 10);
+            
+            // Input event listener
+            input.addEventListener('input', debouncedUpdate);
         });
     }
 
@@ -970,7 +1672,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (exerciseData.muscleGroups && exerciseData.muscleGroups.length > 0) {
             console.log('Populating with muscle groups:', exerciseData.muscleGroups.length);
             
-            exerciseData.muscleGroups.forEach(group => {
+            // Sort muscle groups alphabetically for better UX
+            const sortedGroups = [...exerciseData.muscleGroups].sort((a, b) => {
+                const nameA = typeof a === 'object' ? a.name : a;
+                const nameB = typeof b === 'object' ? b.name : b;
+                return nameA.localeCompare(nameB);
+            });
+            
+            sortedGroups.forEach(group => {
                 const option = document.createElement('option');
                 option.value = typeof group === 'object' ? group.name : group;
                 option.textContent = typeof group === 'object' ? group.name : group;
@@ -989,739 +1698,272 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Add custom option functionality to the dropdown menus
-     * @param {HTMLSelectElement} muscleGroupSelect - The muscle group select element
-     * @param {HTMLSelectElement} equipmentSelect - The equipment select element
-     * @param {HTMLSelectElement} exerciseSelect - The exercise select element
+     * Set up forms for training data entry
      */
-    function addCustomOptionSupport(muscleGroupSelect, equipmentSelect, exerciseSelect) {
-        if (!muscleGroupSelect || !equipmentSelect || !exerciseSelect) {
-            console.error('Missing select elements for custom option support');
+    function setupForms() {
+        console.log('Setting up forms...');
+        
+        // Set up session form
+        const sessionForm = document.getElementById('sessionForm');
+        if (sessionForm) {
+            sessionForm.addEventListener('submit', handleSessionFormSubmit);
+        }
+        
+        // Set up new exercise form
+        const newExerciseForm = document.getElementById('newExerciseForm');
+        if (newExerciseForm) {
+            newExerciseForm.addEventListener('submit', handleNewExercise);
+            
+            // Set up cascading dropdowns
+            setupCascadingDropdowns();
+        }
+        
+        // Set up range sliders
+        setupRangeSliders();
+    }
+    
+    /**
+     * Set up cascading dropdowns for muscle group, equipment, and exercise
+     */
+    function setupCascadingDropdowns() {
+        // Get dropdown elements
+        const muscleGroupDropdown = document.getElementById('newMuscleGroup');
+        const equipmentDropdown = document.getElementById('newEquipment');
+        const exerciseDropdown = document.getElementById('newExerciseName');
+        
+        if (!muscleGroupDropdown || !equipmentDropdown || !exerciseDropdown) {
+            console.warn('One or more dropdowns not found for cascade setup');
             return;
         }
         
-        // Setup cascading filters first
-        setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect);
+        // Initial population of muscle groups
+        populateMuscleGroupDropdown(muscleGroupDropdown);
         
-        // Add custom option handlers for each dropdown
-        addCustomOptionHandler(muscleGroupSelect, 'muscle_group', () => {
-            populateMuscleGroupDropdown(muscleGroupSelect);
-        });
-        
-        addCustomOptionHandler(equipmentSelect, 'equipment', () => {
-            const muscleGroupName = muscleGroupSelect.value;
-            const muscleGroup = exerciseData.muscleGroups.find(g => 
-                g.name === muscleGroupName || g === muscleGroupName);
+        // Muscle group change event - updates equipment options
+        muscleGroupDropdown.addEventListener('change', function() {
+            const selectedMuscle = this.value;
             
-            if (muscleGroup) {
-                const muscleGroupId = typeof muscleGroup === 'object' ? muscleGroup.id : muscleGroup;
-                populateEquipmentDropdown(equipmentSelect, muscleGroupId);
+            // Clear dependent dropdowns
+            clearDropdown(equipmentDropdown, 'Select Equipment');
+            clearDropdown(exerciseDropdown, 'Select Exercise');
+            
+            if (selectedMuscle === '__custom__') {
+                // Show custom muscle group input
+                showCustomInput(this, 'Enter new muscle group');
+                return;
             }
+            
+            if (!selectedMuscle) return;
+            
+            // Add loading state
+            equipmentDropdown.classList.add('loading');
+            
+            // Populate equipment dropdown based on selected muscle group
+            setTimeout(() => {
+                populateEquipmentDropdown(equipmentDropdown, selectedMuscle);
+                equipmentDropdown.classList.remove('loading');
+            }, 100); // Short delay for better UX
         });
         
-        addCustomOptionHandler(exerciseSelect, 'exercise', () => {
-            const muscleGroupName = muscleGroupSelect.value;
-            const equipmentName = equipmentSelect.value;
+        // Equipment change event - updates exercise options
+        equipmentDropdown.addEventListener('change', function() {
+            const selectedEquipment = this.value;
+            const selectedMuscle = muscleGroupDropdown.value;
             
-            const muscleGroup = exerciseData.muscleGroups.find(g => 
-                g.name === muscleGroupName || g === muscleGroupName);
-            const equipment = exerciseData.equipment.find(e => 
-                e.name === equipmentName || e === equipmentName);
+            // Clear exercise dropdown
+            clearDropdown(exerciseDropdown, 'Select Exercise');
             
-            if (muscleGroup && equipment) {
-                const muscleGroupId = typeof muscleGroup === 'object' ? muscleGroup.id : muscleGroup;
-                const equipmentId = typeof equipment === 'object' ? equipment.id : equipment;
-                populateExerciseDropdown(exerciseSelect, muscleGroupId, equipmentId);
+            if (selectedEquipment === '__custom__') {
+                // Show custom equipment input
+                showCustomInput(this, 'Enter new equipment');
+                return;
             }
-        });
-    }
-
-    /**
-     * Setup cascading dropdown filters for muscle groups, equipment, and exercises
-     * @param {HTMLSelectElement} muscleGroupSelect - Muscle group select element
-     * @param {HTMLSelectElement} equipmentSelect - Equipment select element
-     * @param {HTMLSelectElement} exerciseSelect - Exercise select element
-     */
-    function setupCascadingFilters(muscleGroupSelect, equipmentSelect, exerciseSelect) {
-        if (!muscleGroupSelect || !equipmentSelect || !exerciseSelect) {
-            console.error('Missing select elements for cascading filters');
-            return;
-        }
-        
-        console.log('Setting up cascading filters...');
-        
-        // Flag to prevent cascade events during form restoration
-        let isRestoringState = false;
-        
-        // When muscle group changes, update equipment options
-        muscleGroupSelect.addEventListener('change', function() {
-            if (isRestoringState) return;
-            if (this.value === '__custom__' || this.value === '__loading__') return;
             
-            console.log('Muscle group changed to:', this.value);
+            if (!selectedEquipment || !selectedMuscle) return;
             
-            const muscleGroupName = this.value;
-            if (!muscleGroupName) return;
+            // Add loading state
+            exerciseDropdown.classList.add('loading');
             
-            // Reset dependent dropdowns
-            clearDropdown(equipmentSelect, 'Select Equipment');
-            clearDropdown(exerciseSelect, 'Select Exercise');
-            
-            // Add custom options back
-            addCustomOption(equipmentSelect, 'Add New Equipment...');
-            addCustomOption(exerciseSelect, 'Add New Exercise...');
-            
-            // Find muscle group ID
-            const muscleGroup = exerciseData.muscleGroups.find(group => 
-                (typeof group === 'object' && group.name === muscleGroupName) || group === muscleGroupName);
-            
-            if (muscleGroup) {
-                const muscleGroupId = typeof muscleGroup === 'object' ? muscleGroup.id : muscleGroup;
-                populateEquipmentDropdown(equipmentSelect, muscleGroupId);
-            }
+            // Populate exercise dropdown based on muscle group and equipment
+            setTimeout(() => {
+                populateExerciseDropdown(exerciseDropdown, selectedMuscle, selectedEquipment);
+                exerciseDropdown.classList.remove('loading');
+            }, 100); // Short delay for better UX
         });
         
-        // When equipment changes, update exercise options
-        equipmentSelect.addEventListener('change', function() {
-            if (isRestoringState) return;
-            if (this.value === '__custom__' || this.value === '__loading__') return;
-            
-            console.log('Equipment changed to:', this.value);
-            
-            const equipmentName = this.value;
-            const muscleGroupName = muscleGroupSelect.value;
-            if (!equipmentName || !muscleGroupName) return;
-            
-            // Reset exercise dropdown
-            clearDropdown(exerciseSelect, 'Select Exercise');
-            addCustomOption(exerciseSelect, 'Add New Exercise...');
-            
-            // Find muscle group and equipment IDs
-            const muscleGroup = exerciseData.muscleGroups.find(group => 
-                (typeof group === 'object' && group.name === muscleGroupName) || group === muscleGroupName);
-            const equipment = exerciseData.equipment.find(item => 
-                (typeof item === 'object' && item.name === equipmentName) || item === equipmentName);
-            
-            if (muscleGroup && equipment) {
-                const muscleGroupId = typeof muscleGroup === 'object' ? muscleGroup.id : muscleGroup;
-                const equipmentId = typeof equipment === 'object' ? equipment.id : equipment;
-                populateExerciseDropdown(exerciseSelect, muscleGroupId, equipmentId);
-            }
-        });
-    }
-
-    /**
-     * Add a custom option to a select element
-     * @param {HTMLSelectElement} select - The select element
-     * @param {string} text - The text for the custom option
-     */
-    function addCustomOption(select, text) {
-        if (!select) return;
-        
-        const customOption = document.createElement('option');
-        customOption.value = '__custom__';
-        customOption.textContent = text;
-        customOption.classList.add('text-primary');
-        select.appendChild(customOption);
-    }
-
-    /**
-     * Add a custom option handler to a select element
-     * @param {HTMLSelectElement} select - The select element
-     * @param {string} type - The type of data ('muscle_group', 'equipment', 'exercise')
-     * @param {Function} callback - Function to call after adding
-     */
-    function addCustomOptionHandler(select, type, callback) {
-        if (!select) return;
-        
-        // Store original value
-        let originalValue = select.value;
-        
-        // Add change event listener
-        select.addEventListener('change', function() {
+        // Exercise name change event - handle custom exercise
+        exerciseDropdown.addEventListener('change', function() {
             if (this.value === '__custom__') {
-                // Prompt for new value
-                const newValue = prompt(`Enter new ${type} name:`);
-                
-                if (newValue && newValue.trim()) {
-                    // Show loading state
-                    this.disabled = true;
-                    this.value = '__loading__';
-                    
-                    // Determine endpoint based on type
-                    let endpoint;
-                    let data = {};
-                    
-                    switch (type) {
-                        case 'muscle_group':
-                            endpoint = 'api/exercise_library.php?action=add_muscle_group';
-                            data = { name: newValue };
-                            break;
-                        case 'equipment':
-                            endpoint = 'api/exercise_library.php?action=add_equipment';
-                            data = { name: newValue };
-                            break;
-                        case 'exercise':
-                            endpoint = 'api/exercise_library.php?action=add_exercise';
-                            const muscleGroupSelect = document.getElementById('newMuscleGroup');
-                            const equipmentSelect = document.getElementById('newEquipment');
-                            
-                            data = {
-                                name: newValue,
-                                muscle_group: muscleGroupSelect.value,
-                                equipment: equipmentSelect.value
-                            };
-                            break;
-                    }
-                    
-                    // Send API request
-                    fetch(endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        this.disabled = false;
-                        
-                        if (result.success) {
-                            // Reload exercise data
-                            return loadExerciseData().then(() => {
-                                // Call callback to update dropdowns
-                                if (callback) callback();
-                                
-                                // Set to new value if found
-                                const option = Array.from(this.options).find(opt => opt.textContent === newValue);
-                                if (option) {
-                                    this.value = option.value;
-                                    originalValue = option.value;
-                                    
-                                    // Trigger change event
-                                    const event = new Event('change');
-                                    this.dispatchEvent(event);
-                                }
-                                
-                                return true;
-                            });
-                        } else {
-                            throw new Error(result.message || `Failed to add ${type}`);
-                        }
-                    })
-                    .catch(error => {
-                        console.error(`Error adding ${type}:`, error);
-                        alert(`Error: ${error.message}`);
-                        this.value = originalValue;
-                    });
-                } else {
-                    // No value entered, revert to previous selection
-                    this.value = originalValue;
-                }
-            } else {
-                // Update original value for next time
-                originalValue = this.value;
+                // Show custom exercise input
+                showCustomInput(this, 'Enter new exercise name');
             }
         });
     }
-
-    /**
-     * Populate equipment dropdown based on muscle group selection
-     * @param {HTMLSelectElement} equipmentSelect - Equipment select element to update
-     * @param {number|string} muscleGroupId - Selected muscle group ID
-     */
-    function populateEquipmentDropdown(equipmentSelect, muscleGroupId) {
-        if (!equipmentSelect || !muscleGroupId) return;
-        
-        // Preserve custom option
-        const customOption = Array.from(equipmentSelect.options).find(option => option.value === '__custom__');
-        clearDropdown(equipmentSelect, 'Select Equipment');
-        if (customOption) {
-            equipmentSelect.appendChild(customOption);
-        }
-        
-        // Find equipment used with this muscle group
-        const equipmentForMuscleGroup = new Set();
-        
-        exerciseData.exercises.forEach(exercise => {
-            const exerciseMuscleGroupId = typeof exercise.muscle_group === 'object' 
-                ? exercise.muscle_group.id 
-                : exercise.muscle_group_id;
-                
-            if (exerciseMuscleGroupId == muscleGroupId) { // Use loose equality for string/number matching
-                const equipmentId = typeof exercise.equipment === 'object'
-                    ? exercise.equipment.id
-                    : exercise.equipment_id;
-                    
-                if (equipmentId) {
-                    equipmentForMuscleGroup.add(equipmentId);
-                }
-            }
-        });
-        
-        // Add equipment options
-        exerciseData.equipment
-            .filter(equipment => {
-                const equipId = typeof equipment === 'object' ? equipment.id : equipment;
-                return equipmentForMuscleGroup.has(equipId);
-            })
-            .sort((a, b) => {
-                const nameA = typeof a === 'object' ? a.name : a;
-                const nameB = typeof b === 'object' ? b.name : b;
-                return nameA.localeCompare(nameB);
-            })
-            .forEach(equipment => {
-                const option = document.createElement('option');
-                option.value = typeof equipment === 'object' ? equipment.name : equipment;
-                option.textContent = typeof equipment === 'object' ? equipment.name : equipment;
-                equipmentSelect.appendChild(option);
-            });
-    }
-
-    /**
-     * Populate exercise dropdown based on muscle group and equipment selection
-     * @param {HTMLSelectElement} exerciseSelect - Exercise select element to update
-     * @param {number|string} muscleGroupId - Selected muscle group ID
-     * @param {number|string} equipmentId - Selected equipment ID
-     */
-    function populateExerciseDropdown(exerciseSelect, muscleGroupId, equipmentId) {
-        if (!exerciseSelect || !muscleGroupId || !equipmentId) return;
-        
-        // Preserve custom option
-        const customOption = Array.from(exerciseSelect.options).find(option => option.value === '__custom__');
-        clearDropdown(exerciseSelect, 'Select Exercise');
-        if (customOption) {
-            exerciseSelect.appendChild(customOption);
-        }
-        
-        // Find exercises matching muscle group and equipment
-        const matchingExercises = exerciseData.exercises.filter(exercise => {
-            const exerciseMuscleGroupId = typeof exercise.muscle_group === 'object' 
-                ? exercise.muscle_group.id 
-                : exercise.muscle_group_id;
-                
-            const exerciseEquipmentId = typeof exercise.equipment === 'object'
-                ? exercise.equipment.id
-                : exercise.equipment_id;
-                
-            return (exerciseMuscleGroupId == muscleGroupId) && (exerciseEquipmentId == equipmentId);
-        });
-        
-        // Sort and add exercise options
-        matchingExercises
-            .sort((a, b) => {
-                const nameA = a.name || a.exercise_name;
-                const nameB = b.name || b.exercise_name;
-                return nameA.localeCompare(nameB);
-            })
-            .forEach(exercise => {
-                const exerciseName = exercise.name || exercise.exercise_name;
-                const option = document.createElement('option');
-                option.value = exerciseName;
-                option.textContent = exerciseName;
-                exerciseSelect.appendChild(option);
-            });
-    }
-
-    /**
-     * Load workout details for a specific session
-     * @param {number} sessionId - The session ID to load details for
-     */
-    function loadWorkoutDetails(sessionId) {
-        console.log('Loading workout details for session ID:', sessionId);
-        
-        const exercisesList = document.getElementById('exercisesList');
-        if (!exercisesList) {
-            console.warn('Exercises list container not found');
-            return;
-        }
-        
-        exercisesList.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading exercises...</p>
-            </div>
-        `;
-        
-        fetch(`api/workout_details.php?session_id=${sessionId}`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    renderExercisesList(result.data);
-                } else {
-                    exercisesList.innerHTML = `
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            ${result.message || 'No exercises found for this training session'}
-                        </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading workout details:', error);
-                exercisesList.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Error loading exercises. Please try again.
-                    </div>
-                `;
-            });
-    }
-
+    
     /**
      * Clear a dropdown and add a default option
      * @param {HTMLSelectElement} select - The select element to clear
-     * @param {string} defaultText - The text for the default option
+     * @param {string} defaultText - Text for the default option
      */
     function clearDropdown(select, defaultText) {
-        if (!select) {
-            console.error('No select element provided to clearDropdown');
-            return;
-        }
+        if (!select) return;
         
         // Remove all options
-        select.innerHTML = '';
+        while (select.options.length > 0) {
+            select.remove(0);
+        }
         
         // Add default option
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = defaultText || 'Select...';
+        defaultOption.textContent = defaultText;
+        defaultOption.selected = true;
+        defaultOption.disabled = true;
         select.appendChild(defaultOption);
     }
+    
+    /**
+     * Show custom input field for dropdown
+     * @param {HTMLSelectElement} dropdown - The dropdown to replace
+     * @param {string} placeholder - Placeholder for the input
+     */
+    function showCustomInput(dropdown, placeholder) {
+        // Store the original select element's attributes
+        const id = dropdown.id;
+        const name = dropdown.name;
+        const parentElement = dropdown.parentElement;
+        
+        // Create the input element
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = id + 'Custom';
+        input.name = name; // Use same name for form submission
+        input.className = 'form-control';
+        input.placeholder = placeholder;
+        input.required = dropdown.required;
+        
+        // Create a container for the input and cancel button
+        const container = document.createElement('div');
+        container.className = 'input-group';
+        
+        // Create cancel button
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-outline-secondary';
+        cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+        cancelBtn.title = 'Cancel';
+        
+        // Add elements to the container
+        container.appendChild(input);
+        container.appendChild(cancelBtn);
+        
+        // Hide select and show input group
+        dropdown.style.display = 'none';
+        parentElement.appendChild(container);
+        
+        // Set focus to the input
+        input.focus();
+        
+        // Cancel button event handler
+        cancelBtn.addEventListener('click', function() {
+            // Remove the container and show the dropdown again
+            parentElement.removeChild(container);
+            dropdown.style.display = 'block';
+            dropdown.value = '';
+        });
+    }
 
     /**
-     * Handle updating an existing exercise
-     * @param {HTMLFormElement} form - The exercise form element
+     * Populate equipment dropdown based on selected muscle group
+     * @param {HTMLSelectElement} select - The equipment select element
+     * @param {string} muscleGroup - Selected muscle group
      */
-    function handleUpdateExistingExercise(form) {
-        console.log('Updating existing exercise');
+    function populateEquipmentDropdown(select, muscleGroup) {
+        if (!select || !muscleGroup) return;
         
-        if (!form) {
-            console.error('No form provided to handleUpdateExistingExercise');
-            return;
-        }
+        console.log(`Populating equipment for muscle group: ${muscleGroup}`);
         
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+        // Clear current options
+        clearDropdown(select, 'Select Equipment');
         
-        // Show loading state
-        const submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+        // Get equipment for selected muscle group
+        const equipment = exerciseData.equipmentByMuscle?.[muscleGroup] || [];
+        
+        if (equipment.length > 0) {
+            // Sort equipment alphabetically
+            const sortedEquipment = [...equipment].sort((a, b) => a.localeCompare(b));
             
-            fetch('api/workout_details.php', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    const alertContainer = form.querySelector('.workout-alert-message');
-                    showWorkoutMessage('success', 'Exercise updated successfully', alertContainer);
-                } else {
-                    const alertContainer = form.querySelector('.workout-alert-message');
-                    showWorkoutMessage('danger', result.message || 'Failed to update exercise', alertContainer);
-                }
-            })
-            .catch(error => {
-                console.error('Error updating exercise:', error);
-                const alertContainer = form.querySelector('.workout-alert-message');
-                showWorkoutMessage('danger', 'An error occurred. Please try again.', alertContainer);
-            })
-            .finally(() => {
-                // Reset button
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            });
-        }
-    }
-
-    /**
-     * Handle deleting an existing exercise
-     * @param {string} exerciseId - ID of the exercise to delete
-     */
-    function handleDeleteExistingExercise(exerciseId) {
-        console.log('Deleting exercise ID:', exerciseId);
-        
-        if (!exerciseId) {
-            console.error('No exercise ID provided');
-            return;
-        }
-        
-        if (!confirm('Are you sure you want to delete this exercise? This action cannot be undone.')) {
-            return;
-        }
-        
-        fetch('api/workout_details.php', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id: exerciseId })
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showSessionMessage('success', 'Exercise deleted successfully');
-                
-                // Reload exercises list
-                const sessionId = new URLSearchParams(window.location.search).get('id');
-                if (sessionId) {
-                    loadWorkoutDetails(sessionId);
-                }
-            } else {
-                showSessionMessage('danger', result.message || 'Failed to delete exercise');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting exercise:', error);
-            showSessionMessage('danger', 'An error occurred. Please try again.');
-        });
-    }
-
-    /**
-     * Render exercises list for a training session
-     * @param {Array} exercises - List of exercise data
-     */
-    function renderExercisesList(exercises) {
-        console.log('Rendering exercises list:', exercises);
-        
-        const exercisesList = document.getElementById('exercisesList');
-        if (!exercisesList) {
-            console.error('Exercises list container not found');
-            return;
-        }
-        
-        if (!exercises || exercises.length === 0) {
-            exercisesList.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    No exercises added to this training session yet.
-                </div>
-            `;
-            return;
-        }
-        
-        let html = `
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Exercise</th>
-                            <th>Sets</th>
-                            <th>Reps</th>
-                            <th>Weight</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
-        exercises.forEach(exercise => {
-            html += `
-                <tr>
-                    <td>
-                        <strong>${exercise.exercise_name}</strong><br>
-                        <small class="text-muted">${exercise.muscle_group} | ${exercise.equipment}</small>
-                    </td>
-                    <td>${exercise.sets}</td>
-                    <td>${exercise.reps}</td>
-                    <td>${exercise.load_weight} kg</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary edit-exercise" data-id="${exercise.id}">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        html += `
-                    </tbody>
-                </table>
-            </div>
-        `;
-        
-        exercisesList.innerHTML = html;
-        
-        // Add event listeners to edit buttons
-        document.querySelectorAll('.edit-exercise').forEach(button => {
-            button.addEventListener('click', function() {
-                const exerciseId = this.getAttribute('data-id');
-                openEditExerciseModal(exerciseId);
-            });
-        });
-    }
-
-    /**
-     * Open exercise edit modal with exercise data
-     * @param {number} exerciseId - The exercise ID to edit
-     */
-    function openEditExerciseModal(exerciseId) {
-        console.log('Opening edit modal for exercise ID:', exerciseId);
-        
-        fetch(`api/workout_details.php?id=${exerciseId}`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    const exercise = result.data;
-                    const modal = document.getElementById('editExerciseModal');
-                    
-                    if (!modal) {
-                        console.error('Edit exercise modal not found');
-                        showErrorMessage('Error: Edit exercise modal not found');
-                        return;
-                    }
-                    
-                    // Set form values
-                    const idField = document.getElementById('editExerciseId');
-                    if (idField) idField.value = exercise.id;
-                    
-                    // Find form fields and populate with exercise data
-                    populateEditExerciseForm(exercise);
-                    
-                    // Show modal
-                    try {
-                        const bsModal = new bootstrap.Modal(modal);
-                        bsModal.show();
-                    } catch (error) {
-                        console.error('Error showing modal:', error);
-                        showErrorMessage('Error displaying exercise edit form');
-                    }
-                } else {
-                    showErrorMessage(result.message || 'Error loading exercise details');
-                }
-            })
-            .catch(error => {
-                console.error('Error loading exercise details:', error);
-                showErrorMessage('Error loading exercise details. Please try again.');
-            });
-    }
-
-    /**
-     * Populate the edit exercise form with data
-     * @param {Object} exercise - Exercise data object
-     */
-    function populateEditExerciseForm(exercise) {
-        // Flag to prevent cascade events
-        let isRestoringState = true;
-        
-        try {
-            // Set muscle group
-            const muscleGroupSelect = document.getElementById('editMuscleGroup');
-            if (muscleGroupSelect) muscleGroupSelect.value = exercise.muscle_group;
-            
-            // Set equipment
-            const equipmentSelect = document.getElementById('editEquipment');
-            if (equipmentSelect) {
-                clearDropdown(equipmentSelect, 'Select Equipment');
-                
-                // Add the current equipment
+            sortedEquipment.forEach(item => {
                 const option = document.createElement('option');
-                option.value = exercise.equipment;
-                option.textContent = exercise.equipment;
-                equipmentSelect.appendChild(option);
-                
-                equipmentSelect.value = exercise.equipment;
-            }
-            
-            // Set exercise name
-            const exerciseNameSelect = document.getElementById('editExerciseName');
-            if (exerciseNameSelect) {
-                clearDropdown(exerciseNameSelect, 'Select Exercise');
-                
-                // Add the current exercise
-                const option = document.createElement('option');
-                option.value = exercise.exercise_name;
-                option.textContent = exercise.exercise_name;
-                exerciseNameSelect.appendChild(option);
-                
-                exerciseNameSelect.value = exercise.exercise_name;
-            }
-            
-            // Set numeric fields
-            const fields = [
-                { id: 'editPreEnergyLevel', value: exercise.pre_energy_level || '5' },
-                { id: 'editPreSorenessLevel', value: exercise.pre_soreness_level || '5' },
-                { id: 'editSets', value: exercise.sets || '' },
-                { id: 'editReps', value: exercise.reps || '' },
-                { id: 'editLoadWeight', value: exercise.load_weight || '' },
-                { id: 'editRir', value: exercise.rir || '' },
-                { id: 'editStimulus', value: exercise.stimulus || '5' },
-                { id: 'editFatigueLevel', value: exercise.fatigue_level || '5' }
-            ];
-            
-            fields.forEach(field => {
-                const element = document.getElementById(field.id);
-                if (element) element.value = field.value;
+                option.value = item;
+                option.textContent = item;
+                select.appendChild(option);
             });
             
-            // Update range slider displays
-            const rangeDisplays = [
-                { id: 'editEnergyValue', value: exercise.pre_energy_level || '5' },
-                { id: 'editSorenessValue', value: exercise.pre_soreness_level || '5' },
-                { id: 'editStimulusValue', value: exercise.stimulus || '5' },
-                { id: 'editFatigueValue', value: exercise.fatigue_level || '5' }
-            ];
+            // Add custom option
+            const customOption = document.createElement('option');
+            customOption.value = '__custom__';
+            customOption.textContent = 'Add New Equipment...';
+            customOption.classList.add('text-primary');
+            select.appendChild(customOption);
+        } else {
+            console.warn(`No equipment found for muscle group: ${muscleGroup}`);
             
-            rangeDisplays.forEach(display => {
-                const element = document.getElementById(display.id);
-                if (element) element.textContent = display.value;
-            });
-        } finally {
-            // Reset flag
-            isRestoringState = false;
+            // Add custom option anyway
+            const customOption = document.createElement('option');
+            customOption.value = '__custom__';
+            customOption.textContent = 'Add New Equipment...';
+            customOption.classList.add('text-primary');
+            select.appendChild(customOption);
         }
     }
-
+    
     /**
-     * Load recent training sessions
+     * Populate exercise dropdown based on muscle group and equipment
+     * @param {HTMLSelectElement} select - The exercise select element
+     * @param {string} muscleGroup - Selected muscle group
+     * @param {string} equipment - Selected equipment
      */
-    function loadRecentSessions() {
-        console.log('Loading recent training sessions');
+    function populateExerciseDropdown(select, muscleGroup, equipment) {
+        if (!select || !muscleGroup || !equipment) return;
         
-        const recentSessions = document.getElementById('recentSessions');
-        if (!recentSessions) {
-            console.warn('Recent sessions container not found');
-            return;
-        }
+        console.log(`Populating exercises for ${muscleGroup} with ${equipment}`);
         
-        recentSessions.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading recent sessions...</p>
-            </div>
-        `;
+        // Clear current options
+        clearDropdown(select, 'Select Exercise');
         
-        fetch('api/training_sessions.php?action=recent')
-            .then(response => response.json())
-            .then(result => {
-                if (result.success && result.data && result.data.length > 0) {
-                    renderRecentSessions(result.data, recentSessions);
-                } else {
-                    recentSessions.innerHTML = `
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            No recent training sessions found. Create a new session to get started.
-                        </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading recent sessions:', error);
-                recentSessions.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Error loading recent sessions. Please try again.
-                    </div>
-                `;
+        // Get exercises for selected combination
+        const key = `${muscleGroup}|${equipment}`;
+        const exercises = exerciseData.exercisesByMuscleAndEquipment?.[key] || [];
+        
+        if (exercises.length > 0) {
+            // Sort exercises alphabetically
+            const sortedExercises = [...exercises].sort((a, b) => 
+                a.name.localeCompare(b.name));
+            
+            sortedExercises.forEach(exercise => {
+                const option = document.createElement('option');
+                option.value = exercise.name;
+                option.textContent = exercise.name;
+                option.dataset.id = exercise.id || '';  // Store ID if available
+                select.appendChild(option);
             });
+            
+            // Add custom option
+            const customOption = document.createElement('option');
+            customOption.value = '__custom__';
+            customOption.textContent = 'Add New Exercise...';
+            customOption.classList.add('text-primary');
+            select.appendChild(customOption);
+        } else {
+            console.warn(`No exercises found for ${muscleGroup} with ${equipment}`);
+            
+            // Add custom option anyway
+            const customOption = document.createElement('option');
+            customOption.value = '__custom__';
+            customOption.textContent = 'Add New Exercise...';
+            customOption.classList.add('text-primary');
+            select.appendChild(customOption);
+        }
     }
 });
