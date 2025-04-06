@@ -1,0 +1,99 @@
+The web application, Metrics Tracker, is designed to help users track and manage their fitness progress by logging exercises, personal records, and training sessions. It provides a comprehensive interface for users to interact with their workout data, analyze trends, and improve their performance. Below is a detailed description of its functionality:
+
+Core Features
+Exercise Library:
+
+A searchable and filterable database of exercises categorized by muscle groups and equipment.
+Users can view detailed information about each exercise, including descriptions and associated muscle groups.
+Ability to add, edit, and delete exercises through a user-friendly interface.
+Pagination and sorting options for navigating large datasets.
+Workout Templates:
+
+Users can create, save, and manage workout templates for repeated use.
+Templates can include multiple exercises with predefined sets, reps, and weights.
+Dynamic forms for adding exercises to templates, with cascading dropdowns for muscle groups and equipment.
+Training Sessions:
+
+Users can log training sessions by selecting exercises from the library or templates.
+Real-time data entry for sets, reps, and weights during workouts.
+Visual feedback for progress tracking, including charts and summaries.
+Personal Records (PRs):
+
+Automatic tracking of personal records for weight, reps, volume, and time.
+Users can view, acknowledge, and regenerate PRs based on their workout history.
+Highlighting of new PRs for easy identification.
+Dashboard:
+
+A customizable dashboard displaying key metrics, trends, and insights.
+Widgets for activity heatmaps, exercise progress, and correlation analysis.
+Drag-and-drop functionality for rearranging widgets.
+Search and Filters:
+
+Advanced search functionality for exercises, templates, and sessions.
+Filters for muscle groups, equipment, and other attributes.
+Real-time updates to search results and statistics.
+Data Visualization:
+
+Interactive charts for tracking progress over time.
+Heatmaps for visualizing activity levels and trends.
+Correlation analysis between different metrics.
+User Management:
+
+Registration and login functionality with secure authentication.
+Profile management, including theme selection and preferences.
+Integration of user-specific data, such as favorite exercises and recent sessions.
+Responsive Design:
+
+Fully responsive layout optimized for desktop and mobile devices.
+Use of Bootstrap for consistent styling and accessibility.
+API Integration:
+
+RESTful API endpoints for managing exercises, templates, and sessions.
+JSON-based communication for seamless interaction between the frontend and backend.
+Technical Stack
+Frontend:
+
+HTML, CSS, and JavaScript for the user interface.
+Bootstrap for responsive design and UI components.
+Chart.js for data visualization.
+Backend:
+
+PHP for server-side logic and API endpoints.
+MySQL for storing exercise data, user profiles, and session logs.
+Data Management:
+
+SQL scripts for importing and managing exercise data.
+Caching mechanisms for improving performance.
+Key Files and Their Roles
+Frontend:
+
+assets/js/exercise-library.js: Handles exercise search, filtering, and CRUD operations.
+assets/js/training.js: Manages training sessions and exercise logging.
+assets/js/dashboard.js: Renders widgets and visualizations on the dashboard.
+assets/css/styles.css: Custom styles for the application.
+Backend:
+
+exercises.php: Main page for managing the exercise library.
+api/exercise_library.php: API for fetching and updating exercise data.
+api/personal_records.php: API for managing personal records.
+Database:
+
+assets/text/import_exercises.sql: SQL script for populating the exercise database.
+assets/text/exercises - Copy.csv: CSV file containing exercise data.
+User Workflow
+Explore Exercises:
+
+Search for exercises by name, muscle group, or equipment.
+View detailed descriptions and add exercises to templates or sessions.
+Create Workouts:
+
+Use the workout template builder to design custom routines.
+Log training sessions with real-time data entry.
+Track Progress:
+
+View personal records and acknowledge new achievements.
+Analyze trends using charts and heatmaps.
+Customize Experience:
+
+Personalize the dashboard with widgets and themes.
+Manage user preferences and favorite exercises.
