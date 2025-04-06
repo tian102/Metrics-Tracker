@@ -9,6 +9,7 @@ requireLogin();
 $sessionId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $sessionData = null;
 $workoutDetails = null;
+$showExerciseForm = isset($_GET['show_exercise_form']) && $_GET['show_exercise_form'] == 1;
 
 // If session ID is provided, load the session and workout details
 if ($sessionId) {
@@ -21,7 +22,7 @@ if ($sessionId) {
     if (!$sessionData) {
         // Session not found or doesn't belong to current user
         setFlashMessage('danger', 'The requested training session was not found.');
-        redirect('training.php');
+        redirect('track_training.php');
     }
     
     // Load workout exercises
@@ -33,6 +34,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
 ?>
 
 <div class="container-fluid py-3">
+    <!-- Page Header with Action Buttons -->
     <div class="row mb-4">
         <div class="col">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
@@ -43,7 +45,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                     <?php endif; ?>
                 </h2>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="training.php" class="btn btn-primary">
+                    <a href="track_training.php" class="btn btn-primary">
                         <i class="fas fa-plus"></i> New Session
                     </a>
                     <?php if ($sessionId): ?>
@@ -255,13 +257,17 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                     <?php else: ?>
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            No exercises added yet. Use the "Add Exercise" button to add your first exercise or load a template.
+                            <?php if ($showExerciseForm): ?>
+                                Add your first exercise using the form below.
+                            <?php else: ?>
+                                No exercises added yet. Use the "Add Exercise" button to add your first exercise or load a template.
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
                 
-                <!-- New Exercise Form (initially hidden) -->
-                <div id="newExerciseForm" style="display: none;" class="exercise-form-container p-4 border rounded mb-4 bg-light">
+                <!-- New Exercise Form (initially hidden unless auto-show is requested) -->
+                <div id="newExerciseForm" style="display: <?= $showExerciseForm ? 'block' : 'none' ?>;" class="exercise-form-container p-4 border rounded mb-4 bg-light">
                     <h4 class="mb-3">Add New Exercise</h4>
                     <form id="workoutDetailsForm" class="needs-validation" novalidate>
                         <input type="hidden" name="session_id" value="<?= $sessionId ?>">
@@ -335,7 +341,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                                 <div class="form-group">
                                     <label for="newPreEnergyLevel" class="form-label">Pre-Exercise Energy Level (1-10):</label>
                                     <div class="d-flex align-items-center">
-                                        <input type="range" id="newPreEnergyLevel" name="pre_energy_level" min="1" max="10" step="1" value="5" class="form-range flex-grow-1 me-2">
+                                        <input type="range" id="newPreEnergyLevel" name="pre_energy_level" min="1" max="10" step="1" value="5" class="form-range range-slider flex-grow-1 me-2">
                                         <span class="range-value badge bg-primary">5</span>
                                     </div>
                                 </div>
@@ -344,7 +350,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                                 <div class="form-group">
                                     <label for="newPreSorenessLevel" class="form-label">Pre-Exercise Soreness Level (1-10):</label>
                                     <div class="d-flex align-items-center">
-                                        <input type="range" id="newPreSorenessLevel" name="pre_soreness_level" min="1" max="10" step="1" value="5" class="form-range flex-grow-1 me-2">
+                                        <input type="range" id="newPreSorenessLevel" name="pre_soreness_level" min="1" max="10" step="1" value="5" class="form-range range-slider flex-grow-1 me-2">
                                         <span class="range-value badge bg-primary">5</span>
                                     </div>
                                 </div>
@@ -357,7 +363,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                                 <div class="form-group">
                                     <label for="newStimulus" class="form-label">Stimulus (1-10):</label>
                                     <div class="d-flex align-items-center">
-                                        <input type="range" id="newStimulus" name="stimulus" min="1" max="10" step="1" value="5" class="form-range flex-grow-1 me-2">
+                                        <input type="range" id="newStimulus" name="stimulus" min="1" max="10" step="1" value="5" class="form-range range-slider flex-grow-1 me-2">
                                         <span class="range-value badge bg-primary">5</span>
                                     </div>
                                 </div>
@@ -366,7 +372,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                                 <div class="form-group">
                                     <label for="newFatigueLevel" class="form-label">Fatigue Level (1-10):</label>
                                     <div class="d-flex align-items-center">
-                                        <input type="range" id="newFatigueLevel" name="fatigue_level" min="1" max="10" step="1" value="5" class="form-range flex-grow-1 me-2">
+                                        <input type="range" id="newFatigueLevel" name="fatigue_level" min="1" max="10" step="1" value="5" class="form-range range-slider flex-grow-1 me-2">
                                         <span class="range-value badge bg-primary">5</span>
                                     </div>
                                 </div>
@@ -556,9 +562,83 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
     transform: translateY(-5px);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
+
+.range-slider-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.range-slider {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.range-value {
+    min-width: 30px;
+    text-align: center;
+    font-weight: bold;
+}
 </style>
 
 <!-- Load the training JS -->
 <script src="assets/js/training.js"></script>
+
+<!-- Script to ensure all links and form submissions point to track_training.php -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update App.state to use track_training.php instead of training.php
+    if (window.App && window.App.state) {
+        // When deleting a session, redirect to track_training.php
+        const originalDeleteSessionHandler = App.ui.deleteSessionHandler;
+        if (originalDeleteSessionHandler) {
+            App.ui.deleteSessionHandler = function() {
+                const confirmed = confirm('Are you sure you want to delete this training session? This action cannot be undone.');
+                if (!confirmed) return;
+                
+                App.state.isLoading = true;
+                App.ui.showLoadingIndicator();
+                
+                fetch(`api/training_sessions.php?id=${App.state.sessionId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        App.ui.showToast('success', 'Training session deleted successfully');
+                        window.location.href = 'track_training.php';
+                    } else {
+                        App.ui.showToast('danger', result.message || 'Failed to delete training session');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting session:', error);
+                    App.ui.showToast('danger', 'An error occurred while deleting the session');
+                })
+                .finally(() => {
+                    App.state.isLoading = false;
+                    App.ui.hideLoadingIndicator();
+                });
+            };
+        }
+
+        // When session form is submitted, redirect to the correct URL
+        const originalHandleSessionFormSubmit = App.data.handleSessionFormSubmit;
+        if (originalHandleSessionFormSubmit) {
+            // The training.js file now handles this logic with the show_exercise_form parameter
+        }
+    }
+
+    // Fix any template links
+    document.querySelectorAll('[data-template-action="start"]').forEach(button => {
+        button.addEventListener('click', function(e) {
+            const templateId = this.dataset.templateId;
+            if (templateId) {
+                window.location.href = `track_training.php?template_id=${templateId}`;
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once 'includes/footer.php'; ?>

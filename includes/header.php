@@ -59,7 +59,7 @@ $currentUser = isLoggedIn() ? getCurrentUser() : null;
                                     </a>
                                     <ul class="dropdown-menu" aria-labelledby="trackDropdown">
                                         <li><a class="dropdown-item" href="daily.php"><i class="fas fa-heartbeat"></i> Health</a></li>
-                                        <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell"></i> Training</a></li>
+                                        <li><a class="dropdown-item" href="track_training.php"><i class="fas fa-dumbbell"></i> Training</a></li>
                                     </ul>
                                 </li>
                                 <li class="nav-item">

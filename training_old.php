@@ -21,7 +21,7 @@ if ($sessionId) {
     if (!$sessionData) {
         // Session not found or doesn't belong to current user
         setFlashMessage('danger', 'The requested training session was not found.');
-        redirect('training.php');
+        redirect('track_training.php');
     }
     
     // Load workout exercises
@@ -43,7 +43,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                     <?php endif; ?>
                 </h2>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="training.php" class="btn btn-primary">
+                    <a href="track_training.php" class="btn btn-primary">
                         <i class="fas fa-plus"></i> New Session
                     </a>
                     <?php if ($sessionId): ?>

@@ -25,6 +25,7 @@ if (!$preferences) {
 }
 
 // Get user's widgets
+$db = new Database();
 $db->query("SELECT * FROM dashboard_widgets WHERE user_id = :user_id AND is_visible = 1 ORDER BY widget_position");
 $db->bind(':user_id', $_SESSION['user_id']);
 $widgets = $db->resultSet();
@@ -98,7 +99,7 @@ $prCount = $db->single()['count'];
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="addNewDropdown">
                                 <li><a class="dropdown-item" href="daily.php"><i class="fas fa-calendar-day me-2"></i>Daily Metrics</a></li>
-                                <li><a class="dropdown-item" href="training.php"><i class="fas fa-dumbbell me-2"></i>Training Session</a></li>
+                                <li><a class="dropdown-item" href="track_training.php"><i class="fas fa-dumbbell me-2"></i>Training Session</a></li>
                             </ul>
                         </div>
 

@@ -990,7 +990,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!templateId) return;
         
         // Redirect to training page with template ID
-        window.location.href = `training.php?template_id=${templateId}`;
+        window.location.href = `track_training.php?template_id=${templateId}`;
     }
 
     /**
