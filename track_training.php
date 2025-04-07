@@ -5,32 +5,157 @@ require_once 'includes/functions.php';
 // Redirect if not logged in
 requireLogin();
 
-// Check if a specific session ID is requested
+// Define a fallback flash message function if it doesn't exist
+if (!function_exists('setFlashMessage')) {
+    function setFlashMessage($type, $message) {
+        if (!isset($_SESSION['flash_messages'])) {
+            $_SESSION['flash_messages'] = [];
+        }
+        $_SESSION['flash_messages'][] = [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+// Initialize database connection
+$db = new Database();
+
+// Initialize variables
 $sessionId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $sessionData = null;
 $workoutDetails = null;
 $showExerciseForm = isset($_GET['show_exercise_form']) && $_GET['show_exercise_form'] == 1;
+$templateId = isset($_GET['template_id']) ? (int)$_GET['template_id'] : null;
+$errors = [];
 
-// If session ID is provided, load the session and workout details
-if ($sessionId) {
-    $db = new Database();
-    $db->query("SELECT * FROM training_sessions WHERE id = :id AND user_id = :user_id");
-    $db->bind(':id', $sessionId);
-    $db->bind(':user_id', $_SESSION['user_id']);
-    $sessionData = $db->single();
-    
-    if (!$sessionData) {
-        // Session not found or doesn't belong to current user
-        setFlashMessage('danger', 'The requested training session was not found.');
-        redirect('track_training.php');
+try {
+    // If session ID is provided, load the session and workout details
+    if ($sessionId) {
+        // Security: Verify the session belongs to the current user
+        $db->query("SELECT * FROM training_sessions WHERE id = :id AND user_id = :user_id");
+        $db->bind(':id', $sessionId);
+        $db->bind(':user_id', $_SESSION['user_id']);
+        $sessionData = $db->single();
+        
+        if (!$sessionData) {
+            // Session not found or doesn't belong to current user
+            setFlashMessage('danger', 'The requested training session was not found or you do not have permission to view it.');
+            header('Location: track_training.php');
+            exit;
+        }
+        
+        // Load workout exercises for this session
+        $db->query("SELECT wd.* FROM workout_details wd 
+                    JOIN training_sessions ts ON wd.session_id = ts.id 
+                    WHERE wd.session_id = :session_id AND ts.user_id = :user_id 
+                    ORDER BY wd.id ASC");
+        $db->bind(':session_id', $sessionId);
+        $db->bind(':user_id', $_SESSION['user_id']);
+        $workoutDetails = $db->resultSet();
     }
+
+    // Set default date to today if creating a new session
+    $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
     
-    // Load workout exercises
-    $workoutDetails = getWorkoutDetails($sessionId);
+    // Load data for dropdown options
+    $db->query("SELECT DISTINCT name FROM muscle_groups ORDER BY name");
+    $muscleGroups = $db->resultSet() ? array_column($db->resultSet(), 'name') : [];
+    
+    $db->query("SELECT DISTINCT name FROM equipment ORDER BY name");
+    $equipmentTypes = $db->resultSet() ? array_column($db->resultSet(), 'name') : [];
+    
+} catch (Exception $e) {
+    // Log error for debugging
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        $errors[] = "Database error: " . $e->getMessage();
+    } else {
+        $errors[] = "An error occurred while loading data. Please try again.";
+    }
 }
 
-// Set default date to today if creating a new session
-$selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
+// Check if we need to load a template
+if ($sessionId && $templateId) {
+    // Add this section to handle template loading directly in PHP
+    try {
+        $db->query("SELECT * FROM workout_templates WHERE id = :id");
+        $db->bind(':id', $templateId);
+        $template = $db->single();
+        
+        if ($template) {
+            // Log template found for debugging
+            error_log("Template found: " . json_encode($template));
+            
+            // Get template exercises
+            $db->query("SELECT * FROM workout_template_exercises WHERE template_id = :template_id ORDER BY position ASC");
+            $db->bind(':template_id', $templateId);
+            $templateExercises = $db->resultSet();
+            
+            if ($templateExercises) {
+                // Log exercises found for debugging
+                error_log("Template exercises found: " . count($templateExercises));
+                
+                // Add each exercise to the workout session
+                foreach ($templateExercises as $exercise) {
+                    $db->query("INSERT INTO workout_details 
+                                (session_id, muscle_group, equipment, exercise_name, sets, reps, load_weight, rir) 
+                                VALUES 
+                                (:session_id, :muscle_group, :equipment, :exercise_name, :sets, :reps, :load_weight, :rir)");
+                    $db->bind(':session_id', $sessionId);
+                    $db->bind(':muscle_group', $exercise['muscle_group']);
+                    $db->bind(':equipment', $exercise['equipment']);
+                    $db->bind(':exercise_name', $exercise['exercise_name']);
+                    $db->bind(':sets', $exercise['sets']);
+                    $db->bind(':reps', $exercise['reps']);
+                    $db->bind(':load_weight', $exercise['load_weight']);
+                    $db->bind(':rir', $exercise['rir']);
+                    $db->execute();
+                }
+                
+                // Set success message in a way that doesn't require setFlashMessage
+                $_SESSION['template_success'] = 'Template exercises added successfully.';
+                
+                // Redirect to remove template_id from URL to prevent loading it again on refresh
+                header("Location: track_training.php?id={$sessionId}");
+                exit;
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Template loading error: " . $e->getMessage());
+        $errors[] = "Error loading template: " . $e->getMessage();
+    }
+}
+
+// Define mesocycles list (could be moved to database in future)
+$mesocycles = [
+    'Mesocycle 1.1', 'Mesocycle 1.2', 'Mesocycle 1.3', 'Mesocycle 1.4', 'Mesocycle 1.5', 'Mesocycle 1.6',
+    'Mesocycle 2.1', 'Mesocycle 2.2', 'Mesocycle 2.3', 'Mesocycle 2.4', 'Mesocycle 2.5', 'Mesocycle 2.6',
+    'Mesocycle 3.1', 'Mesocycle 3.2', 'Mesocycle 3.3', 'Mesocycle 3.4', 'Mesocycle 3.5', 'Mesocycle 3.6'
+];
+
+// Pass key variables to JavaScript
+$jsVars = [
+    'sessionId' => $sessionId,
+    'userId' => $_SESSION['user_id'],
+    'showExerciseForm' => $showExerciseForm,
+    'templateId' => null, // Set to null to prevent JS from trying to load it again
+    'apiEndpoint' => 'api/training_sessions.php'
+];
+
+// Display any template success message
+if (isset($_SESSION['template_success'])) {
+    echo '<div class="alert alert-success">' . $_SESSION['template_success'] . '</div>';
+    unset($_SESSION['template_success']);
+}
+
+// Display any errors
+if (!empty($errors)) {
+    echo '<div class="alert alert-danger"><ul>';
+    foreach ($errors as $error) {
+        echo '<li>' . htmlspecialchars($error) . '</li>';
+    }
+    echo '</ul></div>';
+}
 ?>
 
 <div class="container-fluid py-3">
@@ -85,12 +210,6 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                             <select id="mesocycleName" name="mesocycle_name" class="form-select">
                                 <option value="">Select Mesocycle</option>
                                 <?php
-                                $mesocycles = [
-                                    'Mesocycle 1.1', 'Mesocycle 1.2', 'Mesocycle 1.3', 'Mesocycle 1.4', 'Mesocycle 1.5', 'Mesocycle 1.6',
-                                    'Mesocycle 2.1', 'Mesocycle 2.2', 'Mesocycle 2.3', 'Mesocycle 2.4', 'Mesocycle 2.5', 'Mesocycle 2.6',
-                                    'Mesocycle 3.1', 'Mesocycle 3.2', 'Mesocycle 3.3', 'Mesocycle 3.4', 'Mesocycle 3.5', 'Mesocycle 3.6'
-                                ];
-                                
                                 foreach ($mesocycles as $mesocycle) {
                                     $selected = ($sessionData && $sessionData['mesocycle_name'] === $mesocycle) ? 'selected' : '';
                                     echo "<option value=\"$mesocycle\" $selected>$mesocycle</option>";
@@ -140,7 +259,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                     </div>
                 </div>
                 
-                <!-- Optional Notes -->
+                <!-- Notes -->
                 <div class="row mt-3">
                     <div class="col-12">
                         <div class="form-group">
@@ -180,13 +299,13 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
                 </div>
             </div>
             <div class="card-body">
-                <!-- Existing Workout Details -->
+                <!-- Exercise List Container -->
                 <div id="exercisesList" class="exercise-list mb-4">
                     <?php if ($workoutDetails && count($workoutDetails) > 0): ?>
                         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
                             <?php foreach ($workoutDetails as $index => $workout): ?>
                                 <div class="col">
-                                    <div class="exercise-container h-100 position-relative" data-exercise-id="<?= $workout['id'] ?>">
+                                    <div class="exercise-card h-100" data-exercise-id="<?= $workout['id'] ?>">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <h4 class="mb-0 fw-bold"><?= htmlspecialchars($workout['exercise_name']) ?></h4>
                                             <div class="dropdown">
@@ -522,21 +641,27 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
     </div>
 </div>
 
+<!-- Toast container for notifications -->
+<div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
 <!-- Custom CSS for the training page -->
 <style>
-.exercise-container {
+/* Exercise cards styling */
+.exercise-card {
     border: 1px solid rgba(0,0,0,.125);
     border-radius: 0.25rem;
     padding: 1rem;
     transition: all 0.2s ease-in-out;
     background-color: #fff;
-    height: 100%;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-.exercise-container:hover {
+.exercise-card:hover {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
 }
 
+/* Range slider styling */
 .form-range {
     height: 1.5rem;
 }
@@ -547,12 +672,14 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
 
 .exercise-form-container {
     transition: all 0.3s ease-in-out;
+    border-radius: 0.375rem;
 }
 
 .exercise-details {
     font-size: 0.95rem;
 }
 
+/* Quick templates styling */
 #quickTemplates .card {
     transition: all 0.2s ease-in-out;
     cursor: pointer;
@@ -563,6 +690,7 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
+/* Range slider container */
 .range-slider-container {
     display: flex;
     align-items: center;
@@ -579,66 +707,66 @@ $selectedDate = $sessionData ? $sessionData['date'] : date('Y-m-d');
     text-align: center;
     font-weight: bold;
 }
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.fade-out {
+    animation: fadeOut 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Toast styling */
+.toast {
+    transition: opacity 0.5s ease-out;
+}
+
+.toast.fade-out {
+    opacity: 0;
+}
+
+/* Table styling for recent sessions */
+#recentSessions .table tr {
+    cursor: pointer;
+}
+
+#recentSessions .table tr:hover {
+    background-color: rgba(0,0,0,.075);
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    border-radius: 0.25rem;
+}
 </style>
 
-<!-- Load the training JS -->
-<script src="assets/js/training.js"></script>
-
-<!-- Script to ensure all links and form submissions point to track_training.php -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Update App.state to use track_training.php instead of training.php
-    if (window.App && window.App.state) {
-        // When deleting a session, redirect to track_training.php
-        const originalDeleteSessionHandler = App.ui.deleteSessionHandler;
-        if (originalDeleteSessionHandler) {
-            App.ui.deleteSessionHandler = function() {
-                const confirmed = confirm('Are you sure you want to delete this training session? This action cannot be undone.');
-                if (!confirmed) return;
-                
-                App.state.isLoading = true;
-                App.ui.showLoadingIndicator();
-                
-                fetch(`api/training_sessions.php?id=${App.state.sessionId}`, {
-                    method: 'DELETE'
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        App.ui.showToast('success', 'Training session deleted successfully');
-                        window.location.href = 'track_training.php';
-                    } else {
-                        App.ui.showToast('danger', result.message || 'Failed to delete training session');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting session:', error);
-                    App.ui.showToast('danger', 'An error occurred while deleting the session');
-                })
-                .finally(() => {
-                    App.state.isLoading = false;
-                    App.ui.hideLoadingIndicator();
-                });
-            };
-        }
-
-        // When session form is submitted, redirect to the correct URL
-        const originalHandleSessionFormSubmit = App.data.handleSessionFormSubmit;
-        if (originalHandleSessionFormSubmit) {
-            // The training.js file now handles this logic with the show_exercise_form parameter
-        }
-    }
-
-    // Fix any template links
-    document.querySelectorAll('[data-template-action="start"]').forEach(button => {
-        button.addEventListener('click', function(e) {
-            const templateId = this.dataset.templateId;
-            if (templateId) {
-                window.location.href = `track_training.php?template_id=${templateId}`;
-            }
-        });
-    });
-});
+    // Pass PHP variables to JavaScript
+    const jsVars = <?= json_encode($jsVars) ?>;
 </script>
+
+<!-- Create a new dedicated training.js file -->
+<script src="assets/js/track-training.js"></script>
 
 <?php require_once 'includes/footer.php'; ?>

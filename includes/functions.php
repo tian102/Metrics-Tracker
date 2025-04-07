@@ -455,3 +455,49 @@ function deleteDailyMetrics($date) {
     
     return $db->execute();
 }
+
+/**
+ * Set a flash message to be displayed on the next page load
+ * 
+ * @param string $type The message type (success, danger, warning, info)
+ * @param string $message The message text
+ * @return void
+ */
+function setFlashMessage($type, $message) {
+    if (!isset($_SESSION['flash_messages'])) {
+        $_SESSION['flash_messages'] = [];
+    }
+    $_SESSION['flash_messages'][] = [
+        'type' => $type,
+        'message' => $message
+    ];
+}
+
+/**
+ * Display and clear all flash messages
+ * 
+ * @return void
+ */
+function displayFlashMessages() {
+    if (isset($_SESSION['flash_messages']) && !empty($_SESSION['flash_messages'])) {
+        foreach ($_SESSION['flash_messages'] as $flash) {
+            echo '<div class="alert alert-' . $flash['type'] . ' alert-dismissible fade show" role="alert">';
+            echo $flash['message'];
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            echo '</div>';
+        }
+        // Clear the flash messages
+        $_SESSION['flash_messages'] = [];
+    }
+}
+
+/**
+ * Redirect to a new page
+ * 
+ * @param string $location The URL to redirect to
+ * @return void
+ */
+function redirect($location) {
+    header("Location: $location");
+    exit;
+}
